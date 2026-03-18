@@ -1,0 +1,25 @@
+{
+  "name": "mirror-ai",
+  "version": "1.0.0",
+  "description": "Remote mobile control for Claude Code — scan a QR, control Claude from your phone",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts"
+  },
+  "keywords": ["claude", "remote", "mobile", "cli"],
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.21.2",
+    "localtunnel": "^2.0.2",
+    "qrcode-terminal": "^0.12.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/ws": "^8.5.13",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
