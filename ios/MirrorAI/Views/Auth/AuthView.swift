@@ -5,6 +5,7 @@ struct AuthView: View {
     @Environment(AppState.self) private var appState
     @State private var isAnimating = false
     @State private var showPrivacyPolicy = false
+    @State private var showTermsOfService = false
 
     var body: some View {
         ZStack {
@@ -45,6 +46,9 @@ struct AuthView: View {
         }
         .sheet(isPresented: $showPrivacyPolicy) {
             privacyPolicySheet
+        }
+        .sheet(isPresented: $showTermsOfService) {
+            termsOfServiceSheet
         }
     }
 
@@ -174,7 +178,7 @@ struct AuthView: View {
 
             HStack(spacing: 4) {
                 Button("Terms of Service") {
-                    showPrivacyPolicy = true
+                    showTermsOfService = true
                 }
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(MirrorTheme.purple)
@@ -195,8 +199,93 @@ struct AuthView: View {
     private var privacyPolicySheet: some View {
         NavigationStack {
             ScrollView {
-                Text("Privacy Policy content goes here.")
-                    .padding()
+                VStack(alignment: .leading, spacing: 20) {
+                    Group {
+                        Text("Last Updated: March 2026")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.secondary)
+
+                        Text("Mirror AI (\"we\", \"our\", or \"us\") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our mobile application.")
+
+                        sectionHeader("1. Information We Collect")
+                        Text("""
+                        We collect the following types of information:
+
+                        - Camera & Photos: We access your device camera and photo library to enable virtual try-on features, selfie-based color analysis, outfit photography, and wardrobe cataloging. Images may be processed by our AI systems to provide styling recommendations.
+
+                        - Personal Information: When you create an account, we collect your name, email address, and authentication credentials. If you sign in via Apple or Google, we receive the information you authorize those services to share.
+
+                        - Style Preferences: We collect information about your fashion preferences, body measurements (height, body shape), gender identity, and style selections to personalize your experience.
+
+                        - Usage Data: We collect information about how you interact with the app, including features used, content viewed, and actions taken within the social feed.
+                        """)
+
+                        sectionHeader("2. How We Use Your Information")
+                        Text("""
+                        We use the information we collect to:
+
+                        - Provide AI-powered styling recommendations and virtual try-on experiences.
+                        - Enable social features including posting outfits, commenting, liking, and following other users.
+                        - Personalize your experience based on your style preferences, body information, and usage patterns.
+                        - Generate AI avatars and style analysis reports.
+                        - Improve our AI models and app functionality.
+                        - Communicate with you about your account, updates, and promotions (with your consent).
+                        """)
+                    }
+
+                    Group {
+                        sectionHeader("3. Third-Party Services")
+                        Text("""
+                        We use the following third-party services:
+
+                        - Google OAuth: For account authentication. Google's privacy policy applies to data processed by Google during sign-in. See: https://policies.google.com/privacy
+
+                        - Supabase: For secure cloud storage of your account data, wardrobe images, and app content. Data is stored in encrypted databases with row-level security. See: https://supabase.com/privacy
+
+                        - Apple Sign-In: For account authentication via Apple ID. Apple's privacy policy governs data shared during sign-in.
+
+                        - StoreKit / Apple In-App Purchases: For subscription management. Payment information is handled entirely by Apple and is never shared with us.
+
+                        We do not sell your personal information to third parties.
+                        """)
+
+                        sectionHeader("4. Your Rights")
+                        Text("""
+                        You have the right to:
+
+                        - Access: Request a copy of the personal data we hold about you.
+                        - Correction: Request correction of inaccurate personal data.
+                        - Deletion: Request deletion of your account and all associated data through the app's Settings > Delete Account feature.
+                        - Data Portability: Request your data in a structured, machine-readable format.
+                        - Withdraw Consent: Withdraw consent for optional data processing at any time.
+
+                        To exercise these rights, contact us at privacy@mirrorai.app.
+                        """)
+
+                        sectionHeader("5. Data Retention & Security")
+                        Text("""
+                        We retain your personal data for as long as your account is active or as needed to provide services. When you delete your account, we permanently remove your personal data within 30 days, except where retention is required by law.
+
+                        We implement industry-standard security measures including encryption in transit (TLS) and at rest, access controls, and regular security audits to protect your data.
+                        """)
+
+                        sectionHeader("6. Children's Privacy (COPPA Compliance)")
+                        Text("""
+                        Mirror AI is not intended for children under the age of 13. We do not knowingly collect personal information from children under 13. If we become aware that we have collected personal data from a child under 13 without parental consent, we will take steps to delete that information immediately.
+
+                        Users between 13 and 17 years of age may use the app with parental or guardian consent.
+                        """)
+
+                        sectionHeader("7. Contact Us")
+                        Text("""
+                        If you have questions or concerns about this Privacy Policy or our data practices, please contact us at:
+
+                        Email: privacy@mirrorai.app
+                        """)
+                    }
+                }
+                .font(.system(size: 14))
+                .padding()
             }
             .navigationTitle("Privacy Policy")
             .navigationBarTitleDisplayMode(.inline)
@@ -206,6 +295,104 @@ struct AuthView: View {
                 }
             }
         }
+    }
+
+    private var termsOfServiceSheet: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    Group {
+                        Text("Last Updated: March 2026")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.secondary)
+
+                        sectionHeader("1. Acceptance of Terms")
+                        Text("""
+                        By accessing or using Mirror AI, you agree to be bound by these Terms of Service. If you do not agree to these terms, do not use the app. We reserve the right to update these terms at any time, and your continued use constitutes acceptance of any changes.
+                        """)
+
+                        sectionHeader("2. Subscription Terms")
+                        Text("""
+                        - Mirror AI offers auto-renewing subscription plans (Pro and Premium) billed monthly through your Apple ID.
+                        - Payment will be charged to your iTunes Account at confirmation of purchase.
+                        - Subscriptions automatically renew unless cancelled at least 24 hours before the end of the current billing period.
+                        - Your account will be charged for renewal within 24 hours prior to the end of the current period at the rate of the selected plan.
+                        - To cancel your subscription: Open Settings on your device > Tap your Apple ID > Tap Subscriptions > Select Mirror AI > Tap Cancel Subscription.
+                        - You may manage your subscriptions and turn off auto-renewal in your Apple ID Account Settings after purchase.
+                        - No refunds will be provided for the unused portion of any subscription period, in accordance with Apple's refund policies.
+                        """)
+
+                        sectionHeader("3. User Content & Conduct")
+                        Text("""
+                        You retain ownership of content you post on Mirror AI. By posting content, you grant us a non-exclusive, worldwide, royalty-free license to use, display, and distribute your content within the app's social features.
+
+                        You agree not to:
+                        - Post content that is illegal, harmful, threatening, abusive, harassing, defamatory, vulgar, obscene, or sexually explicit.
+                        - Impersonate any person or entity or misrepresent your affiliation.
+                        - Upload malicious code, spam, or unauthorized advertising.
+                        - Harass, bully, or intimidate other users.
+                        - Use the app for any unlawful purpose.
+                        - Attempt to reverse-engineer the app or its AI models.
+
+                        We reserve the right to remove content and suspend accounts that violate these rules.
+                        """)
+                    }
+
+                    Group {
+                        sectionHeader("4. Intellectual Property")
+                        Text("""
+                        Mirror AI, including its AI models, algorithms, design, graphics, and software, is owned by Mirror AI and protected by intellectual property laws. You may not copy, modify, distribute, or create derivative works from any part of the app without our written consent.
+
+                        AI-generated content (styling recommendations, avatars, analyses) is provided for personal use only and may not be used commercially without permission.
+                        """)
+
+                        sectionHeader("5. Limitation of Liability")
+                        Text("""
+                        Mirror AI is provided on an "as is" and "as available" basis. To the fullest extent permitted by law:
+
+                        - We disclaim all warranties, express or implied, including fitness for a particular purpose.
+                        - We are not liable for any indirect, incidental, special, consequential, or punitive damages.
+                        - Our total liability shall not exceed the amount you paid for the app in the 12 months preceding the claim.
+                        - AI-generated styling recommendations are for informational purposes only and do not constitute professional fashion advice.
+                        """)
+
+                        sectionHeader("6. Account Termination")
+                        Text("""
+                        We may suspend or terminate your account at our discretion if you violate these terms, engage in abusive behavior, or for any reason with reasonable notice. You may delete your account at any time through Settings > Delete Account.
+
+                        Upon termination, your right to use the app ceases immediately. Data deletion follows our Privacy Policy retention schedule.
+                        """)
+
+                        sectionHeader("7. Governing Law")
+                        Text("""
+                        These Terms shall be governed by and construed in accordance with the laws of the State of California, United States, without regard to its conflict of law provisions. Any disputes arising from these terms shall be resolved in the courts of San Francisco County, California.
+                        """)
+
+                        sectionHeader("8. Contact")
+                        Text("""
+                        For questions about these Terms of Service, contact us at:
+
+                        Email: privacy@mirrorai.app
+                        """)
+                    }
+                }
+                .font(.system(size: 14))
+                .padding()
+            }
+            .navigationTitle("Terms of Service")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { showTermsOfService = false }
+                }
+            }
+        }
+    }
+
+    private func sectionHeader(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 16, weight: .bold))
+            .padding(.top, 4)
     }
 
     // MARK: - Auth Handlers

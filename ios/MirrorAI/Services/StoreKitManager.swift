@@ -1,6 +1,18 @@
 import StoreKit
 import Foundation
 
+enum StoreError: LocalizedError {
+    case pending(String)
+    case unknown(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .pending(let message): return message
+        case .unknown(let message): return message
+        }
+    }
+}
+
 @MainActor
 class StoreKitManager: ObservableObject {
     static let shared = StoreKitManager()
@@ -9,6 +21,7 @@ class StoreKitManager: ObservableObject {
     @Published var creditPacks: [Product] = []
     @Published var purchasedSubscription: Product?
     @Published var isLoading = false
+    @Published var productsLoadError: String?
 
     private let subscriptionProductIds = [
         "com.mirrorai.pro.monthly",
@@ -25,7 +38,10 @@ class StoreKitManager: ObservableObject {
 
     init() {
         transactionListener = listenForTransactions()
-        Task { await loadProducts() }
+        Task {
+            await updateSubscriptionStatus()
+            await loadProducts()
+        }
     }
 
     deinit {
@@ -35,6 +51,7 @@ class StoreKitManager: ObservableObject {
     // Load products from App Store
     func loadProducts() async {
         do {
+            productsLoadError = nil
             let allIds = subscriptionProductIds + creditPackProductIds
             let products = try await Product.products(for: Set(allIds))
             subscriptions = products.filter { subscriptionProductIds.contains($0.id) }
@@ -42,6 +59,7 @@ class StoreKitManager: ObservableObject {
             creditPacks = products.filter { creditPackProductIds.contains($0.id) }
                 .sorted { $0.price < $1.price }
         } catch {
+            productsLoadError = "Unable to load products. Please check your connection."
             print("Failed to load products: \(error)")
         }
     }
@@ -65,7 +83,7 @@ class StoreKitManager: ObservableObject {
         case .userCancelled:
             return nil
         case .pending:
-            return nil
+            throw StoreError.pending("Purchase is pending approval. Please check back later.")
         @unknown default:
             return nil
         }

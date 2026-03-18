@@ -5,10 +5,15 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var showDeleteAlert = false
+    @State private var showDeleteConfirmation = false
+    @State private var deleteConfirmText = ""
     @State private var showLogoutAlert = false
     @State private var notificationsEnabled = true
     @State private var hapticFeedback = true
     @State private var darkMode = true
+    @State private var isDeletingAccount = false
+    @State private var showDeleteError = false
+    @State private var deleteErrorMessage = ""
 
     var body: some View {
         NavigationStack {
@@ -164,13 +169,93 @@ struct SettingsView: View {
             }
             .alert("Delete Account", isPresented: $showDeleteAlert) {
                 Button("Cancel", role: .cancel) {}
-                Button("Delete", role: .destructive) {
-                    // Handle account deletion
-                    let impact = UINotificationFeedbackGenerator()
-                    impact.notificationOccurred(.error)
+                Button("Continue", role: .destructive) {
+                    let impact = UIImpactFeedbackGenerator(style: .heavy)
+                    impact.impactOccurred()
+                    showDeleteConfirmation = true
                 }
             } message: {
-                Text("This action cannot be undone. All your data will be permanently deleted.")
+                Text("This will permanently delete your account, wardrobe, outfits, style data, social posts, and all associated content. This action cannot be undone.")
+            }
+            .alert("Confirm Deletion", isPresented: $showDeleteConfirmation) {
+                TextField("Type DELETE to confirm", text: $deleteConfirmText)
+                Button("Cancel", role: .cancel) {
+                    deleteConfirmText = ""
+                }
+                Button("Permanently Delete", role: .destructive) {
+                    guard deleteConfirmText == "DELETE" else {
+                        deleteConfirmText = ""
+                        return
+                    }
+                    deleteConfirmText = ""
+                    performAccountDeletion()
+                }
+            } message: {
+                Text("Type DELETE in all caps to confirm you want to permanently delete your account.")
+            }
+            .alert("Deletion Failed", isPresented: $showDeleteError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(deleteErrorMessage)
+            }
+            .overlay {
+                if isDeletingAccount {
+                    ZStack {
+                        Color.black.opacity(0.5)
+                            .ignoresSafeArea()
+                        VStack(spacing: 16) {
+                            ProgressView()
+                                .tint(.white)
+                                .scaleEffect(1.3)
+                            Text("Deleting account...")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(.white)
+                        }
+                        .padding(32)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(.ultraThinMaterial)
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Account Deletion
+
+    private func performAccountDeletion() {
+        isDeletingAccount = true
+        let impact = UINotificationFeedbackGenerator()
+
+        Task {
+            do {
+                let url = URL(string: "\(APIConfig.baseURL)/api/user/delete")!
+                var request = URLRequest(url: url)
+                request.httpMethod = "DELETE"
+                if let token = appState.authToken {
+                    request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                }
+
+                let (_, response) = try await URLSession.shared.data(for: request)
+                guard let httpResponse = response as? HTTPURLResponse,
+                      (200...299).contains(httpResponse.statusCode) else {
+                    throw URLError(.badServerResponse)
+                }
+
+                await MainActor.run {
+                    isDeletingAccount = false
+                    impact.notificationOccurred(.success)
+                    appState.logout()
+                    dismiss()
+                }
+            } catch {
+                await MainActor.run {
+                    isDeletingAccount = false
+                    impact.notificationOccurred(.error)
+                    deleteErrorMessage = "Failed to delete account. Please try again or contact support at privacy@mirrorai.app."
+                    showDeleteError = true
+                }
             }
         }
     }

@@ -12,6 +12,8 @@ struct SocialFeedView: View {
     @State private var selectedStoryGroup: StoryGroupModel?
     @State private var showStoryCreator = false
     @State private var showPostCreator = false
+    @State private var showError = false
+    @State private var errorMessage = ""
 
     private let pageSize = 20
 
@@ -106,6 +108,11 @@ struct SocialFeedView: View {
             }
             .sheet(isPresented: $showPostCreator) {
                 PostCreatorView()
+            }
+            .alert("Error", isPresented: $showError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(errorMessage)
             }
             .navigationDestination(item: $selectedPostId) { postId in
                 if let post = appState.feedPosts.first(where: { $0.id == postId }) {
@@ -435,7 +442,7 @@ private struct FeedPostCard: View {
         guard let date = formatter.date(from: dateString) else {
             // Try without fractional seconds
             formatter.formatOptions = [.withInternetDateTime]
-            guard let date = formatter.date(from: dateString) else { return "" }
+            guard let date = formatter.date(from: dateString) else { return "just now" }
             return RelativeDateTimeFormatter().localizedString(for: date, relativeTo: Date())
         }
         let relative = RelativeDateTimeFormatter()

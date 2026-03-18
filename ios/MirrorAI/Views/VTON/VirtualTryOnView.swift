@@ -12,6 +12,8 @@ struct VirtualTryOnView: View {
     @State private var showHistory = false
     @State private var showPaywall = false
     @State private var animateCredits = false
+    @State private var showError = false
+    @State private var errorMessage = ""
 
     private let categories = ["All", "Tops", "Bottoms", "Dresses", "Outerwear", "Shoes"]
 
@@ -82,6 +84,11 @@ struct VirtualTryOnView: View {
             }
             .sheet(isPresented: $showPaywall) {
                 PaywallView()
+            }
+            .alert("Error", isPresented: $showError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(errorMessage)
             }
             .task {
                 await appState.loadVTONCredits()
@@ -258,6 +265,7 @@ struct VirtualTryOnView: View {
             Divider()
 
             Button {
+                isGenerating = true
                 Task { await performTryOn() }
             } label: {
                 HStack(spacing: 10) {
@@ -313,6 +321,11 @@ struct VirtualTryOnView: View {
             let success = UINotificationFeedbackGenerator()
             success.notificationOccurred(.success)
             showResult = true
+        } else {
+            let feedback = UINotificationFeedbackGenerator()
+            feedback.notificationOccurred(.error)
+            errorMessage = "Virtual try-on failed. Please try again."
+            showError = true
         }
     }
 }

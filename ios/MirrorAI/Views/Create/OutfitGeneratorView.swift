@@ -11,6 +11,8 @@ struct OutfitGeneratorView: View {
     @State private var generatedOutfit: OutfitSuggestionModel?
     @State private var showResult = false
     @State private var pulseAnimation = false
+    @State private var showError = false
+    @State private var errorMessage = ""
 
     private let occasions = [
         ("briefcase.fill", "Work"),
@@ -83,6 +85,11 @@ struct OutfitGeneratorView: View {
                 if isGenerating {
                     generatingOverlay
                 }
+            }
+            .alert("Error", isPresented: $showError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(errorMessage)
             }
         }
     }
@@ -427,6 +434,8 @@ struct OutfitGeneratorView: View {
             } else {
                 let notification = UINotificationFeedbackGenerator()
                 notification.notificationOccurred(.error)
+                errorMessage = "Failed to generate outfit. Please try again."
+                showError = true
             }
         }
     }

@@ -6,6 +6,23 @@ import type { AppVariables } from '../types/index.js';
 
 const ai = new Hono<{ Variables: AppVariables }>();
 
+// Per-user AI rate limiting
+const aiRateLimits = new Map<string, { count: number; resetAt: number }>();
+const AI_MAX_REQUESTS = 20;
+const AI_WINDOW_MS = 15 * 60 * 1000;
+
+function checkAIRateLimit(userId: string): boolean {
+  const now = Date.now();
+  const entry = aiRateLimits.get(userId);
+  if (!entry || now > entry.resetAt) {
+    aiRateLimits.set(userId, { count: 1, resetAt: now + AI_WINDOW_MS });
+    return true;
+  }
+  if (entry.count >= AI_MAX_REQUESTS) return false;
+  entry.count++;
+  return true;
+}
+
 // All AI routes require authentication
 ai.use('*', authMiddleware);
 
@@ -30,6 +47,9 @@ When giving advice:
 ai.post('/chat', async (c) => {
   try {
     const userId = c.get('userId');
+    if (!checkAIRateLimit(userId)) {
+      return c.json({ success: false, error: 'AI rate limit exceeded. Please try again later.' }, 429);
+    }
     const body = await c.req.json<{
       message: string;
       history?: Array<{ role: string; content: string }>;
@@ -105,6 +125,9 @@ ${wardrobeSummary}`;
 ai.post('/analyze-outfit', async (c) => {
   try {
     const userId = c.get('userId');
+    if (!checkAIRateLimit(userId)) {
+      return c.json({ success: false, error: 'AI rate limit exceeded. Please try again later.' }, 429);
+    }
     const body = await c.req.json<{
       image: string; // base64
       occasion?: string;
@@ -184,6 +207,9 @@ Return JSON with:
 ai.post('/analyze-colors', async (c) => {
   try {
     const userId = c.get('userId');
+    if (!checkAIRateLimit(userId)) {
+      return c.json({ success: false, error: 'AI rate limit exceeded. Please try again later.' }, 429);
+    }
     const body = await c.req.json<{
       image: string; // base64
     }>();
@@ -240,6 +266,10 @@ Return JSON with:
 // Identify garment from photo. Returns category, color, brand guess, style tags.
 ai.post('/identify-garment', async (c) => {
   try {
+    const userId = c.get('userId');
+    if (!checkAIRateLimit(userId)) {
+      return c.json({ success: false, error: 'AI rate limit exceeded. Please try again later.' }, 429);
+    }
     const body = await c.req.json<{
       image: string; // base64
     }>();

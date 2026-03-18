@@ -15,7 +15,8 @@ struct SubscriptionView: View {
     private struct PlanInfo: Identifiable {
         let id: String
         let name: String
-        let price: String
+        let fallbackPrice: String
+        let productId: String?
         let color: Color
         let icon: String
         let features: [String]
@@ -26,7 +27,8 @@ struct SubscriptionView: View {
         PlanInfo(
             id: "free",
             name: "Free",
-            price: "$0",
+            fallbackPrice: "$0",
+            productId: nil,
             color: .gray,
             icon: "person.fill",
             features: [
@@ -41,7 +43,8 @@ struct SubscriptionView: View {
         PlanInfo(
             id: "pro",
             name: "Pro",
-            price: "$4.99",
+            fallbackPrice: "$4.99",
+            productId: "com.mirrorai.pro.monthly",
             color: Color(hex: "8B5CF6"),
             icon: "star.fill",
             features: [
@@ -57,7 +60,8 @@ struct SubscriptionView: View {
         PlanInfo(
             id: "premium",
             name: "Premium",
-            price: "$9.99",
+            fallbackPrice: "$9.99",
+            productId: "com.mirrorai.premium.monthly",
             color: Color(hex: "FFD700"),
             icon: "crown.fill",
             features: [
@@ -72,6 +76,14 @@ struct SubscriptionView: View {
             highlighted: false
         )
     ]
+
+    private func localizedPrice(for plan: PlanInfo) -> String {
+        guard let productId = plan.productId,
+              let product = storeKit.subscriptions.first(where: { $0.id == productId }) else {
+            return plan.fallbackPrice
+        }
+        return product.displayPrice
+    }
 
     var body: some View {
         NavigationStack {
@@ -188,7 +200,7 @@ struct SubscriptionView: View {
                     Spacer()
 
                     VStack(alignment: .trailing, spacing: 2) {
-                        Text(plan.price)
+                        Text(localizedPrice(for: plan))
                             .font(.system(size: 22, weight: .bold, design: .rounded))
                             .foregroundStyle(.primary)
 

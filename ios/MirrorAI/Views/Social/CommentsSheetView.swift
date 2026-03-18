@@ -10,6 +10,8 @@ struct CommentsSheetView: View {
     @State private var newComment = ""
     @State private var isLoading = false
     @State private var isSending = false
+    @State private var showError = false
+    @State private var errorMessage = ""
     @FocusState private var isInputFocused: Bool
 
     var body: some View {
@@ -41,6 +43,11 @@ struct CommentsSheetView: View {
             }
             .task {
                 await loadComments()
+            }
+            .alert("Error", isPresented: $showError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(errorMessage)
             }
         }
     }
@@ -225,6 +232,8 @@ struct CommentsSheetView: View {
                 )
             }
         } catch {
+            errorMessage = "Failed to load comments. Please try again."
+            showError = true
             print("[CommentsSheet] Failed to load comments: \(error)")
         }
     }
@@ -263,6 +272,8 @@ struct CommentsSheetView: View {
                 notification.notificationOccurred(.success)
             } catch {
                 newComment = commentText
+                errorMessage = "Failed to post comment. Please try again."
+                showError = true
                 print("[CommentsSheet] Failed to add comment: \(error)")
             }
             isSending = false

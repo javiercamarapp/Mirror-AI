@@ -16,8 +16,8 @@ struct CreditsShopView: View {
     private struct CreditPack: Identifiable {
         let id: String
         let credits: Int
-        let price: String
-        let pricePerCredit: String
+        let fallbackPrice: String
+        let fallbackPricePerCredit: String
         let productId: String
         let isBestValue: Bool
         let color: Color
@@ -28,8 +28,8 @@ struct CreditsShopView: View {
         CreditPack(
             id: "small",
             credits: 5,
-            price: "$1.99",
-            pricePerCredit: "$0.40",
+            fallbackPrice: "$1.99",
+            fallbackPricePerCredit: "$0.40",
             productId: "com.mirrorai.credits.5",
             isBestValue: false,
             color: Color(hex: "8B5CF6"),
@@ -38,8 +38,8 @@ struct CreditsShopView: View {
         CreditPack(
             id: "medium",
             credits: 15,
-            price: "$4.99",
-            pricePerCredit: "$0.33",
+            fallbackPrice: "$4.99",
+            fallbackPricePerCredit: "$0.33",
             productId: "com.mirrorai.credits.15",
             isBestValue: false,
             color: Color(hex: "6366F1"),
@@ -48,14 +48,21 @@ struct CreditsShopView: View {
         CreditPack(
             id: "large",
             credits: 50,
-            price: "$14.99",
-            pricePerCredit: "$0.30",
+            fallbackPrice: "$14.99",
+            fallbackPricePerCredit: "$0.30",
             productId: "com.mirrorai.credits.50",
             isBestValue: true,
             color: Color(hex: "EC4899"),
             icon: "bolt.shield.fill"
         )
     ]
+
+    private func localizedPrice(for pack: CreditPack) -> String {
+        guard let product = storeKit.creditPacks.first(where: { $0.id == pack.productId }) else {
+            return pack.fallbackPrice
+        }
+        return product.displayPrice
+    }
 
     var body: some View {
         NavigationStack {
@@ -162,7 +169,7 @@ struct CreditsShopView: View {
                             .font(.system(size: 18, weight: .bold))
                             .foregroundStyle(.primary)
 
-                        Text("\(pack.pricePerCredit) per credit")
+                        Text("\(pack.fallbackPricePerCredit) per credit")
                             .font(.system(size: 13))
                             .foregroundStyle(.secondary)
                     }
@@ -181,7 +188,7 @@ struct CreditsShopView: View {
                                         .fill(pack.color.opacity(0.5))
                                 )
                         } else {
-                            Text(pack.price)
+                            Text(localizedPrice(for: pack))
                                 .font(.system(size: 16, weight: .bold))
                                 .foregroundStyle(.white)
                                 .frame(width: 80, height: 38)

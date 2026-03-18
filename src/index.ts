@@ -3,6 +3,7 @@ import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { serve } from '@hono/node-server';
 import { config, validateConfig } from './config.js';
+import { supabaseAdmin } from './services/supabase.js';
 import type { AppVariables } from './types/index.js';
 import { authRoutes } from './routes/auth.js';
 import { userRoutes } from './routes/user.js';
@@ -84,14 +85,15 @@ app.use('*', async (c, next) => {
 
 // ─── Health Check ────────────────────────────────────────────────────────────
 
-app.get('/api/health', (c) =>
-  c.json({
-    status: 'ok',
-    service: 'mirror-ai-backend',
-    version: '1.0.0',
-    timestamp: new Date().toISOString(),
-  })
-);
+app.get('/api/health', async (c) => {
+  try {
+    const { error } = await supabaseAdmin.from('user_profiles').select('id').limit(1);
+    if (error) throw error;
+    return c.json({ status: 'ok', timestamp: new Date().toISOString() });
+  } catch {
+    return c.json({ status: 'degraded', timestamp: new Date().toISOString() }, 503);
+  }
+});
 
 // ─── Route Modules ───────────────────────────────────────────────────────────
 
@@ -133,7 +135,7 @@ app.onError((err, c) => {
 
 console.log(`Mirror AI backend starting on port ${config.port}...`);
 
-serve(
+const server = serve(
   {
     fetch: app.fetch,
     port: config.port,
@@ -142,5 +144,22 @@ serve(
     console.log(`Mirror AI backend running at http://localhost:${info.port}`);
   }
 );
+
+// Graceful shutdown
+const gracefulShutdown = (signal: string) => {
+  console.log(`${signal} received. Shutting down gracefully...`);
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
+  // Force close after 10s
+  setTimeout(() => {
+    console.error('Forced shutdown after timeout');
+    process.exit(1);
+  }, 10000);
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 export default app;
