@@ -1,65 +1,96 @@
-import { generateToken } from "./auth.js";
-import { createAppServer } from "./server.js";
-import { createTunnel } from "./tunnel.js";
-import qrcode from "qrcode-terminal";
+import { Hono } from 'hono';
+import { cors } from 'hono/cors';
+import { logger } from 'hono/logger';
+import { serve } from '@hono/node-server';
+import { config, validateConfig } from './config.js';
+import type { AppVariables } from './types/index.js';
+import { authRoutes } from './routes/auth.js';
+import { userRoutes } from './routes/user.js';
+import { wardrobeRoutes } from './routes/wardrobe.js';
+import { outfitRoutes } from './routes/outfits.js';
+import { aiRoutes } from './routes/ai.js';
+import { vtonRoutes } from './routes/vton.js';
+import { imageRoutes } from './routes/images.js';
+import { socialRoutes } from './routes/social.js';
+import { friendsRoutes } from './routes/friends.js';
 
-const PORT = parseInt(process.env.PORT || "3777", 10);
-const SKIP_TUNNEL = process.env.SKIP_TUNNEL === "1";
+// Validate required env vars before anything else
+validateConfig();
 
-async function main() {
-  const token = generateToken();
+const app = new Hono<{ Variables: AppVariables }>();
 
-  console.log("\n  Mirror-AI — Remote Mobile Control for Claude Code\n");
+// ─── Global Middleware ────────────────────────────────────────────────────────
 
-  // Start server
-  const server = createAppServer(token, PORT);
-  await server.start();
-  console.log(`  [server] Running on http://localhost:${PORT}`);
+app.use('*', logger());
 
-  let publicUrl: string;
-  let closeTunnel: (() => void) | undefined;
+app.use(
+  '*',
+  cors({
+    origin: '*',
+    allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowHeaders: ['Content-Type', 'Authorization'],
+    exposeHeaders: ['Content-Length'],
+    maxAge: 86400,
+  })
+);
 
-  if (SKIP_TUNNEL) {
-    publicUrl = `http://localhost:${PORT}`;
-    console.log("  [tunnel] Skipped (SKIP_TUNNEL=1)");
-  } else {
-    try {
-      console.log("  [tunnel] Connecting...");
-      const tunnel = await createTunnel(PORT);
-      publicUrl = tunnel.url;
-      closeTunnel = tunnel.close;
-      console.log(`  [tunnel] ${publicUrl}`);
-    } catch (err) {
-      console.error("  [tunnel] Failed, using localhost:", (err as Error).message);
-      publicUrl = `http://localhost:${PORT}`;
-    }
-  }
+// ─── Health Check ────────────────────────────────────────────────────────────
 
-  const fullUrl = `${publicUrl}?token=${token}`;
+app.get('/api/health', (c) =>
+  c.json({
+    status: 'ok',
+    service: 'mirror-ai-backend',
+    version: '1.0.0',
+    timestamp: new Date().toISOString(),
+  })
+);
 
-  // Print QR code
-  console.log("\n  Scan this QR code from your phone:\n");
-  qrcode.generate(fullUrl, { small: true }, (qr: string) => {
-    const indented = qr.split("\n").map(line => "  " + line).join("\n");
-    console.log(indented);
-  });
+// ─── Route Modules ───────────────────────────────────────────────────────────
 
-  console.log(`\n  Or open this URL:\n  ${fullUrl}\n`);
-  console.log("  Waiting for connection...\n");
+app.route('/api/auth', authRoutes);
+app.route('/api/user', userRoutes);
+app.route('/api/wardrobe', wardrobeRoutes);
+app.route('/api/outfits', outfitRoutes);
+app.route('/api/ai', aiRoutes);
+app.route('/api/vton', vtonRoutes);
+app.route('/api/images', imageRoutes);
+app.route('/api/social', socialRoutes);
+app.route('/api/friends', friendsRoutes);
 
-  // Graceful shutdown
-  const shutdown = async () => {
-    console.log("\n  Shutting down...");
-    closeTunnel?.();
-    await server.stop();
-    process.exit(0);
-  };
+// ─── 404 Fallback ────────────────────────────────────────────────────────────
 
-  process.on("SIGINT", shutdown);
-  process.on("SIGTERM", shutdown);
-}
+app.notFound((c) =>
+  c.json({ success: false, error: 'Not found' }, 404)
+);
 
-main().catch((err) => {
-  console.error("Fatal error:", err);
-  process.exit(1);
+// ─── Global Error Handler ────────────────────────────────────────────────────
+
+app.onError((err, c) => {
+  console.error(`[ERROR] ${c.req.method} ${c.req.url}:`, err);
+  return c.json(
+    {
+      success: false,
+      error:
+        process.env.NODE_ENV === 'production'
+          ? 'Internal server error'
+          : err.message,
+    },
+    500
+  );
 });
+
+// ─── Start Server ────────────────────────────────────────────────────────────
+
+console.log(`Mirror AI backend starting on port ${config.port}...`);
+
+serve(
+  {
+    fetch: app.fetch,
+    port: config.port,
+  },
+  (info) => {
+    console.log(`Mirror AI backend running at http://localhost:${info.port}`);
+  }
+);
+
+export default app;

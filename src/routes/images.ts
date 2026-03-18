@@ -1,0 +1,189 @@
+import { Hono } from 'hono';
+import sharp from 'sharp';
+import { authMiddleware } from '../middleware/auth.js';
+import { removeBackground } from '../services/rembg.js';
+import { uploadImage } from '../services/storage.js';
+import type { AppVariables } from '../types/index.js';
+import { v4 as uuidv4 } from 'uuid';
+
+const images = new Hono<{ Variables: AppVariables }>();
+
+// All image routes require authentication
+images.use('*', authMiddleware);
+
+// ─── POST /images/remove-bg ────────────────────────────────────────────────
+// Remove background from image.
+// Body: { image: string (base64) }
+// Returns { image_url: string } (transparent PNG uploaded to storage)
+images.post('/remove-bg', async (c) => {
+  try {
+    const userId = c.get('userId');
+    const body = await c.req.json<{
+      image: string; // base64
+    }>();
+
+    if (!body.image) {
+      return c.json({ success: false, error: 'image (base64) is required' }, 400);
+    }
+
+    // Strip data URI prefix if present
+    const base64Data = body.image.replace(/^data:image\/\w+;base64,/, '');
+    const imageBuffer = Buffer.from(base64Data, 'base64');
+
+    // Remove background
+    const noBgBuffer = await removeBackground(imageBuffer);
+
+    // Upload to storage
+    const path = `${userId}/nobg_${uuidv4()}.png`;
+    const imageUrl = await uploadImage('wardrobe', path, noBgBuffer, 'image/png');
+
+    return c.json({
+      success: true,
+      data: { image_url: imageUrl },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[Remove BG Error]:', err);
+    return c.json({ success: false, error: message }, 500);
+  }
+});
+
+// ─── POST /images/collage ──────────────────────────────────────────────────
+// Generate outfit collage from wardrobe item image URLs.
+// Body: { item_urls: string[] } (array of wardrobe item image URLs)
+// Uses sharp to compose items into a grid collage.
+// Returns { collage_url: string }
+images.post('/collage', async (c) => {
+  try {
+    const userId = c.get('userId');
+    const body = await c.req.json<{
+      item_urls: string[];
+      width?: number;
+      height?: number;
+      background_color?: string;
+    }>();
+
+    if (!body.item_urls || body.item_urls.length === 0) {
+      return c.json({ success: false, error: 'item_urls array is required and must not be empty' }, 400);
+    }
+
+    if (body.item_urls.length > 9) {
+      return c.json({ success: false, error: 'Maximum 9 items per collage' }, 400);
+    }
+
+    const canvasWidth = body.width ?? 1080;
+    const canvasHeight = body.height ?? 1080;
+    const bgColor = body.background_color ?? '#FFFFFF';
+    const padding = 20;
+
+    // Download all item images in parallel
+    const downloadResults = await Promise.allSettled(
+      body.item_urls.map(async (url) => {
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`Failed to download: ${url} (${response.status})`);
+        }
+        const arrayBuffer = await response.arrayBuffer();
+        return Buffer.from(arrayBuffer);
+      })
+    );
+
+    const imageBuffers: Buffer[] = [];
+    for (const result of downloadResults) {
+      if (result.status === 'fulfilled') {
+        imageBuffers.push(result.value);
+      } else {
+        console.error('Failed to download collage image:', result.reason);
+      }
+    }
+
+    if (imageBuffers.length === 0) {
+      return c.json({ success: false, error: 'Could not download any of the provided images' }, 400);
+    }
+
+    // Calculate grid layout
+    const itemCount = imageBuffers.length;
+    let cols: number;
+    let rows: number;
+
+    if (itemCount <= 1) {
+      cols = 1;
+      rows = 1;
+    } else if (itemCount <= 2) {
+      cols = 2;
+      rows = 1;
+    } else if (itemCount <= 4) {
+      cols = 2;
+      rows = 2;
+    } else if (itemCount <= 6) {
+      cols = 3;
+      rows = 2;
+    } else {
+      cols = 3;
+      rows = 3;
+    }
+
+    const cellWidth = Math.floor((canvasWidth - padding * (cols + 1)) / cols);
+    const cellHeight = Math.floor((canvasHeight - padding * (rows + 1)) / rows);
+
+    // Resize all images to fit their cells
+    const resizedBuffers: Buffer[] = [];
+    for (const imgBuffer of imageBuffers) {
+      const resized = await sharp(imgBuffer)
+        .resize(cellWidth, cellHeight, {
+          fit: 'contain',
+          background: { r: 255, g: 255, b: 255, alpha: 0 },
+        })
+        .png()
+        .toBuffer();
+      resizedBuffers.push(resized);
+    }
+
+    // Build composite operations
+    const compositeOps: sharp.OverlayOptions[] = resizedBuffers.map((buf, index) => {
+      const col = index % cols;
+      const row = Math.floor(index / cols);
+      const left = padding + col * (cellWidth + padding);
+      const top = padding + row * (cellHeight + padding);
+
+      return {
+        input: buf,
+        left,
+        top,
+      };
+    });
+
+    // Parse background color
+    const hexMatch = bgColor.match(/^#?([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})$/);
+    const bg = hexMatch
+      ? { r: parseInt(hexMatch[1]!, 16), g: parseInt(hexMatch[2]!, 16), b: parseInt(hexMatch[3]!, 16), alpha: 1 }
+      : { r: 255, g: 255, b: 255, alpha: 1 };
+
+    const collageBuffer = await sharp({
+      create: {
+        width: canvasWidth,
+        height: canvasHeight,
+        channels: 4,
+        background: bg,
+      },
+    })
+      .composite(compositeOps)
+      .png()
+      .toBuffer();
+
+    // Upload to storage
+    const collagePath = `${userId}/collage_${uuidv4()}.png`;
+    const collageUrl = await uploadImage('outfits', collagePath, collageBuffer, 'image/png');
+
+    return c.json({
+      success: true,
+      data: { collage_url: collageUrl },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[Collage Error]:', err);
+    return c.json({ success: false, error: message }, 500);
+  }
+});
+
+export { images as imageRoutes };
