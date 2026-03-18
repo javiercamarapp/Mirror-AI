@@ -178,6 +178,14 @@ user.post('/avatar', async (c) => {
       return c.json({ success: false, error: 'At least one of body_photo or selfie is required' }, 400);
     }
 
+    const maxBase64Size = 10 * 1024 * 1024 * 4 / 3;
+    if (body.body_photo && body.body_photo.length > maxBase64Size) {
+      return c.json({ success: false, error: 'Image exceeds maximum size of 10MB' }, 400);
+    }
+    if (body.selfie && body.selfie.length > maxBase64Size) {
+      return c.json({ success: false, error: 'Image exceeds maximum size of 10MB' }, 400);
+    }
+
     const updates: Record<string, string> = {};
 
     if (body.body_photo) {

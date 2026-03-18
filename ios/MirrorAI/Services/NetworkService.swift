@@ -316,7 +316,7 @@ actor NetworkService {
                 return data
 
             case 401:
-                throw APIError.noAuthToken
+                throw APIError.httpError(statusCode: 401, message: "Your session has expired. Please sign in again.")
 
             case 429:
                 if attempt < maxRetries {
@@ -343,6 +343,9 @@ actor NetworkService {
         } catch let error as APIError {
             throw error
         } catch let error as URLError {
+            if error.code == .notConnectedToInternet {
+                throw APIError.networkError(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "No internet connection. Please check your network settings."]))
+            }
             if attempt < maxRetries && error.code == .timedOut {
                 let delay = baseRetryDelay * pow(2.0, Double(attempt))
                 try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))

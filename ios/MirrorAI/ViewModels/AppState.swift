@@ -620,6 +620,11 @@ class AppState {
                 logout()
                 return
             }
+            if case .httpError(let statusCode, _) = apiError, statusCode == 401 {
+                errorMessage = "Your session has expired. Please sign in again."
+                logout()
+                return
+            }
         } else {
             message = error.localizedDescription
         }

@@ -26,6 +26,10 @@ images.post('/remove-bg', async (c) => {
       return c.json({ success: false, error: 'image (base64) is required' }, 400);
     }
 
+    if (body.image.length > 10 * 1024 * 1024 * 4 / 3) {
+      return c.json({ success: false, error: 'Image exceeds maximum size of 10MB' }, 400);
+    }
+
     // Strip data URI prefix if present
     const base64Data = body.image.replace(/^data:image\/\w+;base64,/, '');
     const imageBuffer = Buffer.from(base64Data, 'base64');

@@ -27,6 +27,10 @@ avatar.post('/generate', async (c) => {
       return c.json({ success: false, error: 'selfie (base64) is required' }, 400);
     }
 
+    if (body.selfie.length > 10 * 1024 * 1024 * 4 / 3) {
+      return c.json({ success: false, error: 'Image exceeds maximum size of 10MB' }, 400);
+    }
+
     // Use Gemini to analyze facial features from selfie
     let analysis: {
       skin_tone: string;

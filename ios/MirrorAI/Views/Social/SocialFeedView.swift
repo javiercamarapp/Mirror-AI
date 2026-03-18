@@ -14,6 +14,12 @@ struct SocialFeedView: View {
     @State private var showPostCreator = false
     @State private var showError = false
     @State private var errorMessage = ""
+    @State private var showReportSheet = false
+    @State private var showBlockAlert = false
+    @State private var reportTargetPostId: String?
+    @State private var reportTargetUserId: String?
+    @State private var selectedReportReason: ReportReason = .spam
+    @State private var isSubmittingReport = false
 
     private let pageSize = 20
 
@@ -52,6 +58,16 @@ struct SocialFeedView: View {
                             },
                             onTap: {
                                 selectedPostId = post.id
+                            },
+                            onReport: {
+                                reportTargetPostId = post.id
+                                reportTargetUserId = post.userId
+                                showReportSheet = true
+                            },
+                            onBlock: {
+                                reportTargetPostId = post.id
+                                reportTargetUserId = post.userId
+                                showBlockAlert = true
                             }
                         )
 
@@ -113,6 +129,17 @@ struct SocialFeedView: View {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(errorMessage)
+            }
+            .sheet(isPresented: $showReportSheet) {
+                reportSheet
+            }
+            .alert("Block User", isPresented: $showBlockAlert) {
+                Button("Cancel", role: .cancel) {}
+                Button("Block", role: .destructive) {
+                    blockUser()
+                }
+            } message: {
+                Text("You will no longer see posts from this user. They will not be notified.")
             }
             .navigationDestination(item: $selectedPostId) { postId in
                 if let post = appState.feedPosts.first(where: { $0.id == postId }) {

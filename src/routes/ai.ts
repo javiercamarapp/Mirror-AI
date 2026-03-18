@@ -327,6 +327,9 @@ Return JSON with:
 ai.post('/shopping-recs', async (c) => {
   try {
     const userId = c.get('userId');
+    if (!checkAIRateLimit(userId)) {
+      return c.json({ success: false, error: 'AI rate limit exceeded. Please try again later.' }, 429);
+    }
     const body = await c.req.json<{
       gaps?: string[];
       budget?: string;

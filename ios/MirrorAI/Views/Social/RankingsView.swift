@@ -6,6 +6,8 @@ struct RankingsView: View {
     @State private var rankings: [RankingEntryModel] = []
     @State private var isLoading = false
     @State private var animateIn = false
+    @State private var showError = false
+    @State private var errorMessage = ""
 
     var body: some View {
         NavigationStack {
@@ -37,6 +39,11 @@ struct RankingsView: View {
                 if rankings.isEmpty {
                     await loadRankings()
                 }
+            }
+            .alert("Error", isPresented: $showError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(errorMessage)
             }
         }
     }
@@ -293,6 +300,8 @@ struct RankingsView: View {
                 )
             }
         } catch {
+            errorMessage = "Failed to load rankings. Please try again."
+            showError = true
             print("[RankingsView] Failed to load rankings: \(error)")
         }
     }

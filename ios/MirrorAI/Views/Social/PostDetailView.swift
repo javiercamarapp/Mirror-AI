@@ -13,6 +13,8 @@ struct PostDetailView: View {
     @State private var showHeartAnimation = false
     @State private var heartScale: CGFloat = 0
     @State private var heartOpacity: Double = 0
+    @State private var showError = false
+    @State private var errorMessage = ""
     @FocusState private var isCommentFieldFocused: Bool
 
     private var currentPost: SocialPostModel {
@@ -115,6 +117,11 @@ struct PostDetailView: View {
             commentInputBar
         }
         .navigationBarTitleDisplayMode(.inline)
+        .alert("Error", isPresented: $showError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(errorMessage)
+        }
         .task {
             await loadComments()
         }
@@ -383,6 +390,8 @@ struct PostDetailView: View {
                 notification.notificationOccurred(.success)
             } catch {
                 newComment = commentText
+                errorMessage = "Failed to post comment. Please try again."
+                showError = true
                 print("[PostDetailView] Failed to add comment: \(error)")
             }
             isSendingComment = false
