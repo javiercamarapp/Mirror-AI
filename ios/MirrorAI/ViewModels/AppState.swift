@@ -482,9 +482,9 @@ class AppState {
         guard let index = feedPosts.firstIndex(where: { $0.id == postId }) else { return }
 
         // Optimistic update
-        let wasLiked = feedPosts[index].isLiked ?? false
+        let wasLiked = feedPosts[index].isLiked
         feedPosts[index].isLiked = !wasLiked
-        feedPosts[index].likesCount = (feedPosts[index].likesCount ?? 0) + (wasLiked ? -1 : 1)
+        feedPosts[index].likesCount += wasLiked ? -1 : 1
 
         do {
             let liked = try await socialService.likePost(id: postId)
@@ -496,7 +496,7 @@ class AppState {
             // Revert on failure
             if let idx = feedPosts.firstIndex(where: { $0.id == postId }) {
                 feedPosts[idx].isLiked = wasLiked
-                feedPosts[idx].likesCount = (feedPosts[idx].likesCount ?? 0) + (wasLiked ? 1 : -1)
+                feedPosts[idx].likesCount += wasLiked ? 1 : -1
             }
             handleError(error, context: "toggling like")
         }
@@ -629,11 +629,11 @@ class AppState {
 
     private func updateStyleTier() {
         switch styleScore {
-        case 0..<200: styleTier = "Bronce"
-        case 200..<500: styleTier = "Plata"
-        case 500..<1000: styleTier = "Oro"
-        case 1000..<2000: styleTier = "Platino"
-        default: styleTier = "Diamante"
+        case 0..<200: styleTier = "Bronze"
+        case 200..<500: styleTier = "Silver"
+        case 500..<1000: styleTier = "Gold"
+        case 1000..<2000: styleTier = "Platinum"
+        default: styleTier = "Diamond"
         }
     }
 

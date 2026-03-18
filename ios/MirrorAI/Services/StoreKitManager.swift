@@ -56,6 +56,10 @@ class StoreKitManager: ObservableObject {
         case .success(let verification):
             let transaction = try checkVerified(verification)
             await transaction.finish()
+
+            // Verify receipt with backend
+            await verifyWithBackend(transaction: transaction, product: product)
+
             await updateSubscriptionStatus()
             return transaction
         case .userCancelled:
@@ -89,6 +93,29 @@ class StoreKitManager: ObservableObject {
                     print("Transaction failed verification: \(error)")
                 }
             }
+        }
+    }
+
+    // Verify receipt with backend
+    private func verifyWithBackend(transaction: Transaction, product: Product) async {
+        do {
+            let receiptData = transaction.jsonRepresentation.base64EncodedString()
+            let productId = transaction.productID
+
+            if subscriptionProductIds.contains(productId) {
+                let _ = try await SubscriptionService.shared.verifyReceipt(
+                    receiptData: receiptData,
+                    productId: productId
+                )
+            } else if creditPackProductIds.contains(productId) {
+                let _ = try await SubscriptionService.shared.purchaseCredits(
+                    productId: productId,
+                    receiptData: receiptData,
+                    transactionId: String(transaction.id)
+                )
+            }
+        } catch {
+            print("Backend receipt verification failed: \(error.localizedDescription)")
         }
     }
 
