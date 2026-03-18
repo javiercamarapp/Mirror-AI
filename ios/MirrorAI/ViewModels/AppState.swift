@@ -47,20 +47,24 @@ class AppState {
     var isLoading = false
     var errorMessage: String?
 
-    // ─── Private ─────────────────────────────────────────────────────────
+    // ─── Services ────────────────────────────────────────────────────────
     private let network = NetworkService.shared
+    private let wardrobeService = WardrobeService.shared
+    private let socialService = SocialService.shared
+    private let aiService = AIService.shared
+    private let vtonService = FashnService.shared
     private let tokenKey = "mirror_ai_auth_token"
 
     // MARK: - Initialization
 
-    /// Called on app launch -- checks persisted token, loads profile if available
+    /// Called on app launch -- checks persisted token, loads profile if available.
     func initialize() async {
         if let savedToken = UserDefaults.standard.string(forKey: tokenKey) {
             await setAuthToken(savedToken)
         }
     }
 
-    /// Set token, persist it, configure NetworkService, and load all user data
+    /// Set token, persist it, configure NetworkService, and load all user data.
     func setAuthToken(_ token: String) async {
         authToken = token
         isLoggedIn = true
@@ -70,7 +74,7 @@ class AppState {
         isLoading = true
         defer { isLoading = false }
 
-        // Load profile first, then parallel-load everything else
+        // Load profile first so we know subscription plan, then parallel-load the rest
         await loadProfile()
 
         async let w: () = loadWardrobe()
@@ -80,7 +84,7 @@ class AppState {
         _ = await (w, s, n, vc)
     }
 
-    /// Clear all state and remove persisted token
+    /// Clear all state and remove persisted token.
     func logout() {
         authToken = nil
         isLoggedIn = false
@@ -130,11 +134,39 @@ class AppState {
 
     func updateProfile(_ updates: [String: Any]) async {
         do {
-            let updated: UserProfileModel = try await network.apiRequest(
-                APIConfig.Endpoints.userProfile,
-                method: "PATCH",
-                body: DictionaryEncodable(updates)
-            )
+            let bodyData = try JSONSerialization.data(withJSONObject: updates)
+            guard let token = await network.getAuthToken() else {
+                handleError(APIError.noAuthToken, context: "updating profile")
+                return
+            }
+            guard let url = URL(string: APIConfig.baseURL + APIConfig.Endpoints.userProfile) else {
+                handleError(APIError.invalidURL, context: "updating profile")
+                return
+            }
+
+            var request = URLRequest(url: url)
+            request.httpMethod = "PATCH"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            request.httpBody = bodyData
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200...299).contains(httpResponse.statusCode) else {
+                let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+                throw APIError.httpError(statusCode: code, message: "Failed to update profile")
+            }
+
+            let decoder = JSONDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            let apiResponse = try decoder.decode(APIResponse<UserProfileModel>.self, from: data)
+
+            guard apiResponse.success, let updated = apiResponse.data else {
+                throw APIError.apiResponseError(apiResponse.error ?? "Failed to update profile")
+            }
+
             currentUser = updated
             subscriptionPlan = updated.subscriptionPlan
             isOnboardingComplete = updated.onboardingCompleted
@@ -145,11 +177,39 @@ class AppState {
 
     func saveOnboarding(_ data: [String: Any]) async {
         do {
-            let profile: UserProfileModel = try await network.apiRequest(
-                APIConfig.Endpoints.userOnboarding,
-                method: "POST",
-                body: DictionaryEncodable(data)
-            )
+            let bodyData = try JSONSerialization.data(withJSONObject: data)
+            guard let token = await network.getAuthToken() else {
+                handleError(APIError.noAuthToken, context: "saving onboarding")
+                return
+            }
+            guard let url = URL(string: APIConfig.baseURL + APIConfig.Endpoints.userOnboarding) else {
+                handleError(APIError.invalidURL, context: "saving onboarding")
+                return
+            }
+
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            request.httpBody = bodyData
+
+            let (responseData, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200...299).contains(httpResponse.statusCode) else {
+                let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+                throw APIError.httpError(statusCode: code, message: "Failed to save onboarding")
+            }
+
+            let decoder = JSONDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            let apiResponse = try decoder.decode(APIResponse<UserProfileModel>.self, from: responseData)
+
+            guard apiResponse.success, let profile = apiResponse.data else {
+                throw APIError.apiResponseError(apiResponse.error ?? "Failed to save onboarding")
+            }
+
             currentUser = profile
             isOnboardingComplete = true
         } catch {
@@ -164,10 +224,8 @@ class AppState {
         defer { wardrobeLoading = false }
 
         do {
-            let items: [WardrobeItemModel] = try await network.apiRequest(
-                APIConfig.Endpoints.wardrobe
-            )
-            wardrobeItems = items
+            let items = try await wardrobeService.getItems()
+            wardrobeItems = items.map { $0.toModel() }
         } catch {
             handleError(error, context: "loading wardrobe")
         }
@@ -180,28 +238,10 @@ class AppState {
         }
 
         do {
-            guard let imageData = image.jpegData(compressionQuality: 0.8) else {
-                errorMessage = "Failed to process image"
-                return nil
-            }
-
-            var fields: [String: String] = [:]
-            if let name { fields["name"] = name }
-            if let category { fields["category"] = category }
-
-            let response: APIResponse<WardrobeItemModel> = try await network.uploadMultipart(
-                APIConfig.Endpoints.wardrobe,
-                imageData: imageData,
-                additionalFields: fields.isEmpty ? nil : fields
-            )
-
-            guard response.success, let item = response.data else {
-                errorMessage = response.error ?? "Failed to add wardrobe item"
-                return nil
-            }
-
-            wardrobeItems.insert(item, at: 0)
-            return item
+            let item = try await wardrobeService.addItem(image: image, name: name, category: category)
+            let model = item.toModel()
+            wardrobeItems.insert(model, at: 0)
+            return model
         } catch {
             handleError(error, context: "adding wardrobe item")
             return nil
@@ -209,34 +249,30 @@ class AppState {
     }
 
     func removeWardrobeItem(_ id: String) async {
+        let backup = wardrobeItems
+        wardrobeItems.removeAll { $0.id == id }
+
         do {
-            let _: APIResponse<EmptyData> = try await network.request(
-                "\(APIConfig.Endpoints.wardrobe)/\(id)",
-                method: "DELETE"
-            )
-            wardrobeItems.removeAll { $0.id == id }
+            try await wardrobeService.deleteItem(id: id)
         } catch {
+            wardrobeItems = backup
             handleError(error, context: "removing wardrobe item")
         }
     }
 
     func toggleFavorite(_ id: String) async {
         guard let index = wardrobeItems.firstIndex(where: { $0.id == id }) else { return }
-        let newValue = !wardrobeItems[index].isFavorite
-
-        // Optimistic update
-        wardrobeItems[index].isFavorite = newValue
+        let previousValue = wardrobeItems[index].isFavorite
+        wardrobeItems[index].isFavorite = !previousValue
 
         do {
-            let _: APIResponse<WardrobeItemModel> = try await network.request(
-                "\(APIConfig.Endpoints.wardrobe)/\(id)",
-                method: "PATCH",
-                body: FavoriteUpdate(isFavorite: newValue)
-            )
-        } catch {
-            // Revert on failure
+            let updated = try await wardrobeService.toggleFavorite(id: id)
             if let idx = wardrobeItems.firstIndex(where: { $0.id == id }) {
-                wardrobeItems[idx].isFavorite = !newValue
+                wardrobeItems[idx] = updated.toModel()
+            }
+        } catch {
+            if let idx = wardrobeItems.firstIndex(where: { $0.id == id }) {
+                wardrobeItems[idx].isFavorite = previousValue
             }
             handleError(error, context: "toggling favorite")
         }
@@ -244,12 +280,13 @@ class AppState {
 
     func logWear(_ id: String) async {
         do {
-            let updated: WardrobeItemModel = try await network.apiRequest(
-                "\(APIConfig.Endpoints.wardrobe)/\(id)/wear",
-                method: "POST"
-            )
+            try await wardrobeService.logWear(id: id)
+            // Increment wear count locally
             if let index = wardrobeItems.firstIndex(where: { $0.id == id }) {
-                wardrobeItems[index] = updated
+                wardrobeItems[index].wearCount += 1
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
+                wardrobeItems[index].lastWorn = formatter.string(from: Date())
             }
         } catch {
             handleError(error, context: "logging wear")
@@ -260,18 +297,21 @@ class AppState {
 
     func generateOutfit(occasion: String, weather: String?, mood: String?) async -> OutfitSuggestionModel? {
         do {
-            var body: [String: Any] = ["occasion": occasion]
-            if let weather { body["weather"] = weather }
-            if let mood { body["mood"] = mood }
-
-            let suggestions: [OutfitSuggestionModel] = try await network.apiRequest(
-                APIConfig.Endpoints.outfitGenerate,
-                method: "POST",
-                body: DictionaryEncodable(body)
+            let suggestion = try await aiService.generateOutfit(
+                occasion: occasion,
+                weather: weather,
+                mood: mood
             )
-
-            // Return the top suggestion (highest score)
-            return suggestions.max(by: { $0.score < $1.score })
+            // Map OutfitSuggestion -> OutfitSuggestionModel
+            let model = OutfitSuggestionModel(
+                name: suggestion.vibe,
+                itemIds: suggestion.itemIds,
+                stylingTips: suggestion.styleTips.joined(separator: "\n"),
+                score: suggestion.score,
+                reasoning: suggestion.reasoning,
+                items: wardrobeItems.filter { suggestion.itemIds.contains($0.id) }
+            )
+            return model
         } catch {
             handleError(error, context: "generating outfit")
             return nil
@@ -295,11 +335,39 @@ class AppState {
                 body["image"] = imageData.base64EncodedString()
             }
 
-            let daily: DailyOutfitModel = try await network.apiRequest(
-                APIConfig.Endpoints.outfitDaily,
-                method: "POST",
-                body: DictionaryEncodable(body)
-            )
+            let bodyData = try JSONSerialization.data(withJSONObject: body)
+            guard let token = await network.getAuthToken() else {
+                handleError(APIError.noAuthToken, context: "saving outfit of the day")
+                return
+            }
+            guard let url = URL(string: APIConfig.baseURL + APIConfig.Endpoints.outfitDaily) else {
+                handleError(APIError.invalidURL, context: "saving outfit of the day")
+                return
+            }
+
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            request.httpBody = bodyData
+
+            let (responseData, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200...299).contains(httpResponse.statusCode) else {
+                let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+                throw APIError.httpError(statusCode: code, message: "Failed to save outfit")
+            }
+
+            let decoder = JSONDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            let apiResponse = try decoder.decode(APIResponse<DailyOutfitModel>.self, from: responseData)
+
+            guard apiResponse.success, let daily = apiResponse.data else {
+                throw APIError.apiResponseError(apiResponse.error ?? "Failed to save outfit")
+            }
+
             todaysOutfit = daily
             streakCount += 1
         } catch {
@@ -345,10 +413,8 @@ class AppState {
         defer { feedLoading = false }
 
         do {
-            let posts: [SocialPostModel] = try await network.apiRequest(
-                APIConfig.Endpoints.socialFeed
-            )
-            feedPosts = posts
+            let posts = try await socialService.getFeed()
+            feedPosts = posts.map { $0.toModel() }
         } catch {
             handleError(error, context: "loading feed")
         }
@@ -356,10 +422,8 @@ class AppState {
 
     func loadStories() async {
         do {
-            let groups: [StoryGroupModel] = try await network.apiRequest(
-                APIConfig.Endpoints.socialStories
-            )
-            stories = groups
+            let groups = try await socialService.getStories()
+            stories = groups.map { $0.toModel() }
         } catch {
             handleError(error, context: "loading stories")
         }
@@ -367,19 +431,13 @@ class AppState {
 
     func createPost(type: String, imageUrl: String, caption: String, occasion: String?) async {
         do {
-            var body: [String: Any] = [
-                "type": type,
-                "image_url": imageUrl,
-                "caption": caption
-            ]
-            if let occasion { body["occasion"] = occasion }
-
-            let post: SocialPostModel = try await network.apiRequest(
-                APIConfig.Endpoints.socialPosts,
-                method: "POST",
-                body: DictionaryEncodable(body)
+            let post = try await socialService.createPost(
+                type: type,
+                imageUrl: imageUrl,
+                caption: caption,
+                occasion: occasion
             )
-            feedPosts.insert(post, at: 0)
+            feedPosts.insert(post.toModel(), at: 0)
         } catch {
             handleError(error, context: "creating post")
         }
@@ -394,10 +452,11 @@ class AppState {
         feedPosts[index].likesCount = (feedPosts[index].likesCount ?? 0) + (wasLiked ? -1 : 1)
 
         do {
-            let _: LikeToggleResponse = try await network.apiRequest(
-                "\(APIConfig.Endpoints.socialPosts)/\(postId)/like",
-                method: "POST"
-            )
+            let liked = try await socialService.likePost(id: postId)
+            // Reconcile with server truth
+            if let idx = feedPosts.firstIndex(where: { $0.id == postId }) {
+                feedPosts[idx].isLiked = liked
+            }
         } catch {
             // Revert on failure
             if let idx = feedPosts.firstIndex(where: { $0.id == postId }) {
@@ -410,14 +469,7 @@ class AppState {
 
     func createStory(imageUrl: String, caption: String?) async {
         do {
-            var body: [String: Any] = ["image_url": imageUrl]
-            if let caption { body["caption"] = caption }
-
-            let _: StoryModel = try await network.apiRequest(
-                APIConfig.Endpoints.socialStories,
-                method: "POST",
-                body: DictionaryEncodable(body)
-            )
+            let _ = try await socialService.createStory(imageUrl: imageUrl, caption: caption)
             // Reload stories to get updated groups
             await loadStories()
         } catch {
@@ -447,11 +499,28 @@ class AppState {
         }
 
         do {
-            let _: APIResponse<EmptyData> = try await network.request(
-                "\(APIConfig.Endpoints.userNotifications)/\(id)",
-                method: "PATCH",
-                body: ReadUpdate(read: true)
-            )
+            guard let token = await network.getAuthToken() else {
+                throw APIError.noAuthToken
+            }
+            guard let url = URL(string: APIConfig.baseURL + "\(APIConfig.Endpoints.userNotifications)/\(id)") else {
+                throw APIError.invalidURL
+            }
+
+            var request = URLRequest(url: url)
+            request.httpMethod = "PATCH"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["read": true])
+
+            let (_, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200...299).contains(httpResponse.statusCode) else {
+                throw APIError.httpError(
+                    statusCode: (response as? HTTPURLResponse)?.statusCode ?? 0,
+                    message: "Failed to mark notification as read"
+                )
+            }
         } catch {
             // Revert on failure
             if let index = notifications.firstIndex(where: { $0.id == id }) {
@@ -466,9 +535,7 @@ class AppState {
 
     func loadVTONCredits() async {
         do {
-            let credits: VTONCreditsModel = try await network.apiRequest(
-                APIConfig.Endpoints.vtonCredits
-            )
+            let credits = try await vtonService.getCredits()
             vtonCredits = credits.creditsRemaining
         } catch {
             handleError(error, context: "loading VTON credits")
@@ -482,17 +549,10 @@ class AppState {
         }
 
         do {
-            let body: [String: Any] = [
-                "garment_url": garmentUrl,
-                "category": category
-            ]
-
-            let result: VTONGenerateResponse = try await network.apiRequest(
-                APIConfig.Endpoints.vtonGenerate,
-                method: "POST",
-                body: DictionaryEncodable(body)
+            let result = try await vtonService.generateTryOn(
+                garmentImageUrl: garmentUrl,
+                category: category
             )
-
             vtonCredits = result.creditsRemaining
             return result.resultImageUrl
         } catch {
@@ -521,7 +581,6 @@ class AppState {
         let message: String
         if let apiError = error as? APIError {
             message = apiError.errorDescription ?? "Unknown error"
-            // If unauthorized, force logout
             if case .noAuthToken = apiError {
                 logout()
                 return
@@ -550,35 +609,83 @@ class AppState {
     }
 }
 
-// MARK: - Helper Encodable Types
+// MARK: - Service-to-Model Mapping Extensions
 
-/// Wraps a [String: Any] dictionary to conform to Encodable for use with NetworkService
-private struct DictionaryEncodable: Encodable {
-    let dictionary: [String: Any]
-
-    init(_ dictionary: [String: Any]) {
-        self.dictionary = dictionary
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        let data = try JSONSerialization.data(withJSONObject: dictionary)
-        let json = try JSONSerialization.jsonObject(with: data)
-        try container.encode(AnyCodable(json))
-    }
-}
-
-private struct FavoriteUpdate: Encodable {
-    let isFavorite: Bool
-
-    enum CodingKeys: String, CodingKey {
-        case isFavorite = "is_favorite"
+extension WardrobeItemResponse {
+    func toModel() -> WardrobeItemModel {
+        WardrobeItemModel(
+            id: id,
+            userId: userId,
+            name: name,
+            category: category,
+            subcategory: subcategory,
+            color: color,
+            brand: brand,
+            imageUrl: imageUrl,
+            imageNoBgUrl: imageNoBgUrl,
+            season: season,
+            occasions: occasions,
+            wearCount: wearCount,
+            isFavorite: isFavorite,
+            lastWorn: lastWorn,
+            createdAt: createdAt
+        )
     }
 }
 
-private struct ReadUpdate: Encodable {
-    let read: Bool
+extension SocialPostResponse {
+    func toModel() -> SocialPostModel {
+        SocialPostModel(
+            id: id,
+            userId: userId,
+            type: type,
+            imageUrl: imageUrl,
+            caption: caption,
+            outfitData: outfitData,
+            outfitId: outfitId,
+            occasion: occasion,
+            score: score,
+            likesCount: likesCount,
+            commentsCount: commentsCount,
+            isLiked: isLiked,
+            user: user?.toModel(),
+            createdAt: createdAt
+        )
+    }
 }
 
-/// Empty placeholder for responses with no meaningful data payload
+extension SocialUserInfo {
+    func toModel() -> PostUserInfo {
+        PostUserInfo(fullName: fullName, username: username, avatarUrl: avatarUrl)
+    }
+}
+
+extension StoryGroup {
+    func toModel() -> StoryGroupModel {
+        StoryGroupModel(
+            user: user?.toModel(),
+            stories: stories.map { $0.toModel() },
+            hasUnviewed: hasUnviewed
+        )
+    }
+}
+
+extension StoryResponse {
+    func toModel() -> StoryModel {
+        StoryModel(
+            id: id,
+            userId: userId,
+            imageUrl: imageUrl,
+            caption: caption,
+            outfitData: outfitData,
+            viewsCount: viewsCount,
+            expiresAt: expiresAt,
+            isViewed: isViewed,
+            user: user?.toModel(),
+            createdAt: createdAt
+        )
+    }
+}
+
+/// Empty placeholder for responses with no meaningful data payload.
 struct EmptyData: Codable {}

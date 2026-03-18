@@ -13,7 +13,7 @@ class FriendsViewModel {
     var errorMessage: String?
 
     // ─── Private ─────────────────────────────────────────────────────────
-    private let network = NetworkService.shared
+    private let friendsService = FriendsService.shared
     private var searchTask: Task<Void, Never>?
 
     // MARK: - Load Friends
@@ -23,10 +23,8 @@ class FriendsViewModel {
         defer { isLoading = false }
 
         do {
-            let result: [FriendProfileModel] = try await network.apiRequest(
-                APIConfig.Endpoints.friends
-            )
-            friends = result
+            let result = try await friendsService.getFriends()
+            friends = result.map { $0.toProfileModel() }
         } catch {
             handleError(error, context: "loading friends")
         }
@@ -36,10 +34,8 @@ class FriendsViewModel {
 
     func loadPendingRequests() async {
         do {
-            let result: [FriendRequestModel] = try await network.apiRequest(
-                APIConfig.Endpoints.friendsRequests
-            )
-            pendingRequests = result
+            let result = try await friendsService.getPendingRequests()
+            pendingRequests = result.map { $0.toRequestModel() }
         } catch {
             handleError(error, context: "loading pending requests")
         }
@@ -47,9 +43,8 @@ class FriendsViewModel {
 
     // MARK: - Search Users
 
-    /// Search for users by username or name with debounce
+    /// Search for users by username or name with debounce.
     func searchUsers(_ query: String) async {
-        // Cancel any in-flight search
         searchTask?.cancel()
 
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -59,17 +54,14 @@ class FriendsViewModel {
         }
 
         searchTask = Task {
-            // Debounce: wait 300ms before firing request
+            // Debounce 300ms
             try? await Task.sleep(nanoseconds: 300_000_000)
             guard !Task.isCancelled else { return }
 
             do {
-                let results: [UserSearchResultModel] = try await network.apiRequest(
-                    APIConfig.Endpoints.friendsSearch,
-                    queryParams: ["q": trimmed]
-                )
+                let results = try await friendsService.searchUsers(query: trimmed)
                 guard !Task.isCancelled else { return }
-                searchResults = results
+                searchResults = results.map { $0.toSearchResultModel() }
             } catch {
                 guard !Task.isCancelled else { return }
                 handleError(error, context: "searching users")
@@ -83,11 +75,7 @@ class FriendsViewModel {
 
     func sendRequest(userId: String) async {
         do {
-            let _: FriendshipResponse = try await network.apiRequest(
-                APIConfig.Endpoints.friendsRequest,
-                method: "POST",
-                body: FriendRequestBody(userId: userId, username: nil)
-            )
+            try await friendsService.sendRequest(userId: userId)
             // Update the search result to reflect pending status
             if let index = searchResults.firstIndex(where: { $0.id == userId }) {
                 searchResults[index].friendshipStatus = "pending"
@@ -101,12 +89,7 @@ class FriendsViewModel {
 
     func sendRequestByUsername(_ username: String) async {
         do {
-            let _: FriendshipResponse = try await network.apiRequest(
-                APIConfig.Endpoints.friendsRequest,
-                method: "POST",
-                body: FriendRequestBody(userId: nil, username: username)
-            )
-            // Update the search result to reflect pending status
+            try await friendsService.sendRequest(username: username)
             if let index = searchResults.firstIndex(where: { $0.username == username }) {
                 searchResults[index].friendshipStatus = "pending"
             }
@@ -119,10 +102,7 @@ class FriendsViewModel {
 
     func acceptRequest(_ id: String) async {
         do {
-            let _: FriendshipResponse = try await network.apiRequest(
-                "\(APIConfig.Endpoints.friendsRequests)/\(id)/accept",
-                method: "POST"
-            )
+            try await friendsService.acceptRequest(id: id)
             // Move from pending to friends
             if let index = pendingRequests.firstIndex(where: { $0.id == id }),
                let requester = pendingRequests[index].requester {
@@ -130,7 +110,6 @@ class FriendsViewModel {
                 friends.append(requester)
             } else {
                 pendingRequests.removeAll { $0.id == id }
-                // Reload friends to get the updated list
                 await loadFriends()
             }
         } catch {
@@ -142,10 +121,7 @@ class FriendsViewModel {
 
     func rejectRequest(_ id: String) async {
         do {
-            let _: APIResponse<EmptyData> = try await network.request(
-                "\(APIConfig.Endpoints.friendsRequests)/\(id)/reject",
-                method: "POST"
-            )
+            try await friendsService.rejectRequest(id: id)
             pendingRequests.removeAll { $0.id == id }
         } catch {
             handleError(error, context: "rejecting friend request")
@@ -155,17 +131,12 @@ class FriendsViewModel {
     // MARK: - Remove Friend
 
     func removeFriend(_ id: String) async {
-        // Optimistic removal
         let removed = friends.first(where: { $0.id == id })
         friends.removeAll { $0.id == id }
 
         do {
-            let _: APIResponse<EmptyData> = try await network.request(
-                "\(APIConfig.Endpoints.friends)/\(id)",
-                method: "DELETE"
-            )
+            try await friendsService.removeFriend(id: id)
         } catch {
-            // Revert on failure
             if let removed {
                 friends.append(removed)
             }
@@ -177,10 +148,8 @@ class FriendsViewModel {
 
     func loadFriendCloset(_ friendId: String) async -> [WardrobeItemModel] {
         do {
-            let items: [WardrobeItemModel] = try await network.apiRequest(
-                "\(APIConfig.Endpoints.friends)/\(friendId)/closet"
-            )
-            return items
+            let items = try await friendsService.getFriendCloset(friendId: friendId)
+            return items.map { $0.toModel() }
         } catch {
             handleError(error, context: "loading friend's closet")
             return []
@@ -189,7 +158,7 @@ class FriendsViewModel {
 
     // MARK: - Refresh All
 
-    /// Convenience to reload both friends and pending requests in parallel
+    /// Reload both friends and pending requests in parallel.
     func refreshAll() async {
         isLoading = true
         defer { isLoading = false }
@@ -213,14 +182,41 @@ class FriendsViewModel {
     }
 }
 
-// MARK: - Request Body
+// MARK: - FriendsService-to-AppModels Mapping
 
-private struct FriendRequestBody: Encodable {
-    let userId: String?
-    let username: String?
+extension FriendProfile {
+    func toProfileModel() -> FriendProfileModel {
+        FriendProfileModel(
+            id: id,
+            fullName: fullName,
+            username: username,
+            avatarUrl: avatarUrl,
+            styleScore: styleScore,
+            streakCount: streakCount
+        )
+    }
+}
 
-    enum CodingKeys: String, CodingKey {
-        case userId = "user_id"
-        case username
+extension FriendRequest {
+    func toRequestModel() -> FriendRequestModel {
+        FriendRequestModel(
+            id: id,
+            requesterId: requesterId,
+            requester: requester?.toProfileModel(),
+            createdAt: createdAt
+        )
+    }
+}
+
+extension UserSearchResult {
+    func toSearchResultModel() -> UserSearchResultModel {
+        UserSearchResultModel(
+            id: id,
+            fullName: fullName,
+            username: username,
+            avatarUrl: avatarUrl,
+            styleScore: styleScore,
+            friendshipStatus: friendshipStatus
+        )
     }
 }
