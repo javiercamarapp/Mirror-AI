@@ -72,6 +72,133 @@ struct OnboardingView: View {
         }
     }
 
+    // MARK: - Step 0: Age Verification
+
+    private var ageVerificationStep: some View {
+        VStack(spacing: 32) {
+            Spacer()
+
+            Image(systemName: "person.badge.shield.checkmark.fill")
+                .font(.system(size: 60))
+                .foregroundStyle(MirrorTheme.gradientPrimary)
+                .symbolEffect(.bounce, options: .nonRepeating)
+
+            VStack(spacing: 12) {
+                Text("How old are you?")
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+
+                Text("We need to verify your age to continue")
+                    .font(.system(size: 16))
+                    .foregroundStyle(.white.opacity(0.7))
+                    .multilineTextAlignment(.center)
+            }
+
+            VStack(spacing: 14) {
+                ageOptionCard(label: "18 or older", value: "18+")
+                ageOptionCard(label: "13-17", value: "13-17")
+                ageOptionCard(label: "Under 13", value: "Under 13")
+            }
+            .padding(.horizontal, 16)
+
+            if selectedAgeRange == "Under 13" {
+                VStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 24))
+                        .foregroundStyle(.yellow)
+
+                    Text("Sorry, Mirror AI is not available for users under 13.")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+
+                    Text("This is required by law (COPPA) to protect children's privacy.")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .multilineTextAlignment(.center)
+                }
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color.red.opacity(0.15))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .strokeBorder(Color.red.opacity(0.3), lineWidth: 1)
+                        )
+                )
+                .padding(.horizontal, 16)
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
+
+            if selectedAgeRange == "13-17" {
+                VStack(spacing: 8) {
+                    Image(systemName: "info.circle.fill")
+                        .font(.system(size: 24))
+                        .foregroundStyle(MirrorTheme.purple)
+
+                    Text("Parental Consent Required")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(.white)
+
+                    Text("By continuing, you confirm that a parent or guardian has given consent for you to use Mirror AI.")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.white.opacity(0.7))
+                        .multilineTextAlignment(.center)
+                }
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(MirrorTheme.purple.opacity(0.1))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .strokeBorder(MirrorTheme.purple.opacity(0.3), lineWidth: 1)
+                        )
+                )
+                .padding(.horizontal, 16)
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
+
+            Spacer()
+            Spacer()
+        }
+        .padding(.horizontal)
+        .animation(.easeInOut(duration: 0.3), value: selectedAgeRange)
+    }
+
+    private func ageOptionCard(label: String, value: String) -> some View {
+        Button {
+            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+            impactFeedback.impactOccurred()
+            withAnimation(.spring(response: 0.3)) {
+                selectedAgeRange = value
+            }
+        } label: {
+            HStack(spacing: 16) {
+                Text(label)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white)
+
+                Spacer()
+
+                if selectedAgeRange == value {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 24))
+                        .foregroundStyle(.white)
+                        .transition(.scale.combined(with: .opacity))
+                }
+            }
+            .padding(18)
+            .background(
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(selectedAgeRange == value ? AnyShapeStyle(MirrorTheme.gradientPrimary) : AnyShapeStyle(Color.white.opacity(0.08)))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18)
+                            .strokeBorder(selectedAgeRange == value ? Color.clear : Color.white.opacity(0.12), lineWidth: 1)
+                    )
+            )
+        }
+    }
+
     // MARK: - Step 1: Welcome
 
     private var welcomeStep: some View {
@@ -496,11 +623,12 @@ struct OnboardingView: View {
 
     private var canProceed: Bool {
         switch currentStep {
-        case 0: return !name.trimmingCharacters(in: .whitespaces).isEmpty
-        case 1: return selectedGender != nil
-        case 2: return true // body info optional
-        case 3: return !selectedStyles.isEmpty
-        case 4: return true // selfie optional
+        case 0: return selectedAgeRange != nil && selectedAgeRange != "Under 13"
+        case 1: return !name.trimmingCharacters(in: .whitespaces).isEmpty
+        case 2: return selectedGender != nil
+        case 3: return true // body info optional
+        case 4: return !selectedStyles.isEmpty
+        case 5: return true // selfie optional
         default: return true
         }
     }
@@ -521,6 +649,9 @@ struct OnboardingView: View {
         }
         if let bodyShape = selectedBodyShape {
             data["body_shape"] = bodyShape.lowercased()
+        }
+        if let ageRange = selectedAgeRange {
+            data["age_range"] = ageRange.lowercased()
         }
 
         Task {
