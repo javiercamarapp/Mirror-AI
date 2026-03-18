@@ -7,11 +7,18 @@ struct MirrorAIApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environment(appState)
-                .preferredColorScheme(.dark)
-                .tint(Color("AccentPurple"))
-                .onChange(of: scenePhase) { _, newPhase in
+            ZStack(alignment: .top) {
+                ContentView()
+                    .environment(appState)
+
+                OfflineBanner()
+            }
+            .preferredColorScheme(.dark)
+            .tint(Color("AccentPurple"))
+            .onOpenURL { url in
+                handleDeepLink(url)
+            }
+            .onChange(of: scenePhase) { _, newPhase in
                     switch newPhase {
                     case .active:
                         Task {
@@ -25,6 +32,59 @@ struct MirrorAIApp: App {
                         break
                     }
                 }
+        }
+    }
+
+    // MARK: - Deep Link Handling
+
+    private func handleDeepLink(_ url: URL) {
+        // Handle magic link callbacks for email auth
+        if url.scheme == "mirrorai" {
+            if url.host == "auth" || url.host == "callback" {
+                // Extract code from URL query params
+                if let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+                   let code = components.queryItems?.first(where: { $0.name == "code" })?.value {
+                    Task {
+                        await handleAuthCallback(code: code)
+                    }
+                }
+            }
+        }
+    }
+
+    private func handleAuthCallback(code: String) async {
+        do {
+            guard let url = URL(string: APIConfig.baseURL + "/api/auth/callback") else { return }
+
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["code": code])
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200...299).contains(httpResponse.statusCode) else { return }
+
+            struct CallbackResponse: Decodable {
+                let accessToken: String
+                let refreshToken: String
+                enum CodingKeys: String, CodingKey {
+                    case accessToken = "access_token"
+                    case refreshToken = "refresh_token"
+                }
+            }
+
+            let decoder = JSONDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            let apiResponse = try decoder.decode(APIResponse<CallbackResponse>.self, from: data)
+
+            if let authData = apiResponse.data {
+                _ = KeychainManager.save(authData.refreshToken, forKey: "mirror_ai_refresh_token")
+                await appState.setAuthToken(authData.accessToken)
+            }
+        } catch {
+            print("[MirrorAIApp] Auth callback failed: \(error)")
         }
     }
 }

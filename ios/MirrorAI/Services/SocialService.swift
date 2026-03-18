@@ -10,10 +10,10 @@ class SocialService {
 
     // MARK: - Feed
 
-    func getFeed(limit: Int = 20, offset: Int = 0) async throws -> [SocialPostResponse] {
+    func getFeed(limit: Int = 20, page: Int = 1) async throws -> [SocialPostResponse] {
         let queryParams = [
             "limit": String(limit),
-            "offset": String(offset)
+            "page": String(page)
         ]
 
         let posts: [SocialPostResponse] = try await network.apiRequest(

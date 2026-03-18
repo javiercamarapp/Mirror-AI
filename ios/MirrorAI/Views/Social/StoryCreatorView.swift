@@ -201,15 +201,14 @@ struct StoryCreatorView: View {
         isPosting = true
 
         Task {
-            // In production, upload image first and get URL
-            // For now, convert to base64 data URL as placeholder
-            if let imageData = image.jpegData(compressionQuality: 0.8) {
-                let base64 = imageData.base64EncodedString()
-                let imageUrl = "data:image/jpeg;base64,\(base64.prefix(100))"
+            do {
+                let imageUrl = try await ImageUploadService.shared.uploadImage(image, bucket: "social")
                 await appState.createStory(
                     imageUrl: imageUrl,
                     caption: caption.isEmpty ? nil : caption
                 )
+            } catch {
+                appState.errorMessage = "Failed to upload story image. Please try again."
             }
 
             isPosting = false

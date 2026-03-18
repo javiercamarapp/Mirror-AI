@@ -8,6 +8,172 @@ const auth = new Hono<{ Variables: AppVariables }>();
 // Rate limiting for /auth/ routes is handled by the global rate limiter middleware
 // in index.ts (10 requests per 15 minutes for /api/auth/ paths).
 
+// ─── POST /auth/apple ─────────────────────────────────────────────────────────
+// Sign in with Apple ID token.
+auth.post('/apple', async (c) => {
+  try {
+    const body = await c.req.json<{ id_token: string; full_name?: string }>();
+
+    if (!body.id_token) {
+      return c.json({ success: false, error: 'id_token is required' }, 400);
+    }
+
+    const { data: sessionData, error: signInError } =
+      await supabaseAdmin.auth.signInWithIdToken({
+        provider: 'apple',
+        token: body.id_token,
+      });
+
+    if (signInError || !sessionData.user || !sessionData.session) {
+      return c.json(
+        { success: false, error: signInError?.message ?? 'Failed to sign in with Apple' },
+        401
+      );
+    }
+
+    const user = sessionData.user;
+    const session = sessionData.session;
+
+    // Check if profile already exists
+    const { data: existingProfile } = await supabaseAdmin
+      .from('user_profiles')
+      .select('id')
+      .eq('id', user.id)
+      .single();
+
+    const isNewUser = !existingProfile;
+
+    if (isNewUser) {
+      await supabaseAdmin.from('user_profiles').insert({
+        id: user.id,
+        email: user.email ?? '',
+        full_name: body.full_name ?? user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? 'User',
+        avatar_url: user.user_metadata?.avatar_url ?? null,
+        style_preferences: [],
+        subscription_plan: 'free',
+        onboarding_completed: false,
+        vton_credits: 3,
+      });
+    } else if (body.full_name) {
+      // Update name if provided on existing user
+      await supabaseAdmin
+        .from('user_profiles')
+        .update({ full_name: body.full_name })
+        .eq('id', user.id);
+    }
+
+    return c.json({
+      success: true,
+      data: {
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+        expires_at: session.expires_at,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: body.full_name ?? user.user_metadata?.full_name ?? null,
+        },
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return c.json({ success: false, error: message }, 500);
+  }
+});
+
+// ─── POST /auth/google ────────────────────────────────────────────────────────
+// Sign in with Google ID token.
+auth.post('/google', async (c) => {
+  try {
+    const body = await c.req.json<{ id_token: string }>();
+
+    if (!body.id_token) {
+      return c.json({ success: false, error: 'id_token is required' }, 400);
+    }
+
+    const { data: sessionData, error: signInError } =
+      await supabaseAdmin.auth.signInWithIdToken({
+        provider: 'google',
+        token: body.id_token,
+      });
+
+    if (signInError || !sessionData.user || !sessionData.session) {
+      return c.json(
+        { success: false, error: signInError?.message ?? 'Failed to sign in with Google' },
+        401
+      );
+    }
+
+    const user = sessionData.user;
+    const session = sessionData.session;
+
+    // Ensure profile exists
+    const { data: existingProfile } = await supabaseAdmin
+      .from('user_profiles')
+      .select('id')
+      .eq('id', user.id)
+      .single();
+
+    if (!existingProfile) {
+      await supabaseAdmin.from('user_profiles').insert({
+        id: user.id,
+        email: user.email ?? '',
+        full_name: user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? 'User',
+        avatar_url: user.user_metadata?.avatar_url ?? null,
+        style_preferences: [],
+        subscription_plan: 'free',
+        onboarding_completed: false,
+        vton_credits: 3,
+      });
+    }
+
+    return c.json({
+      success: true,
+      data: {
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+        expires_at: session.expires_at,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.user_metadata?.full_name ?? null,
+        },
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return c.json({ success: false, error: message }, 500);
+  }
+});
+
+// ─── POST /auth/magic-link ───────────────────────────────────────────────────
+// Send a magic link to the user's email.
+auth.post('/magic-link', async (c) => {
+  try {
+    const body = await c.req.json<{ email: string }>();
+
+    if (!body.email) {
+      return c.json({ success: false, error: 'email is required' }, 400);
+    }
+
+    const { error } = await supabaseAdmin.auth.signInWithOtp({
+      email: body.email,
+    });
+
+    if (error) {
+      return c.json({ success: false, error: error.message }, 400);
+    }
+
+    return c.json({
+      success: true,
+      data: { message: 'Magic link sent to your email' },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return c.json({ success: false, error: message }, 500);
+  }
+});
+
 // ─── POST /auth/signup ────────────────────────────────────────────────────────
 // After Supabase Auth signup on the client, this creates the user profile row.
 auth.post('/signup', async (c) => {

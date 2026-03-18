@@ -1,0 +1,9 @@
+node_modules
+.git
+.env
+.env.local
+*.md
+.github
+ios
+supabase
+scripts

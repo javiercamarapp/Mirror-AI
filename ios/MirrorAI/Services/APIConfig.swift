@@ -27,6 +27,10 @@ enum APIConfig {
         // Auth
         static let authSignup = "/api/auth/signup"
         static let authCallback = "/api/auth/callback"
+        static let authApple = "/api/auth/apple"
+        static let authGoogle = "/api/auth/google"
+        static let authMagicLink = "/api/auth/magic-link"
+        static let authRefresh = "/api/auth/refresh"
 
         // User
         static let userProfile = "/api/user/profile"
@@ -61,6 +65,7 @@ enum APIConfig {
         static let vtonHistory = "/api/vton/history"
 
         // Images
+        static let imageUpload = "/api/images/upload"
         static let imageRemoveBg = "/api/images/remove-bg"
         static let imageCollage = "/api/images/collage"
 

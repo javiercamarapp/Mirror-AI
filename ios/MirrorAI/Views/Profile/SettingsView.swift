@@ -85,10 +85,57 @@ struct SettingsView: View {
                         .fill(.ultraThinMaterial)
                 )
 
+                // Support
+                Section {
+                    Button {
+                        clearImageCache()
+                    } label: {
+                        HStack(spacing: 12) {
+                            settingsIcon(icon: "arrow.triangle.2.circlepath", color: .teal)
+                            Text("Clear Image Cache")
+                                .font(.system(size: 15))
+                                .foregroundStyle(.primary)
+                            Spacer()
+                        }
+                    }
+
+                    Button {
+                        exportUserData()
+                    } label: {
+                        HStack(spacing: 12) {
+                            settingsIcon(icon: "square.and.arrow.up.fill", color: .cyan)
+                            Text("Export My Data")
+                                .font(.system(size: 15))
+                                .foregroundStyle(.primary)
+                            Spacer()
+                        }
+                    }
+
+                    Button {
+                        reportBug()
+                    } label: {
+                        HStack(spacing: 12) {
+                            settingsIcon(icon: "ladybug.fill", color: .red)
+                            Text("Report a Bug")
+                                .font(.system(size: 15))
+                                .foregroundStyle(.primary)
+                            Spacer()
+                        }
+                    }
+                } header: {
+                    Text("Support")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .listRowBackground(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(.ultraThinMaterial)
+                )
+
                 // About
                 Section {
                     settingsRow(icon: "info.circle.fill", color: .blue, title: "Version") {
-                        Text("1.0.0")
+                        Text("\(appVersion) (\(buildNumber))")
                             .font(.system(size: 14))
                             .foregroundStyle(.secondary)
                     }
@@ -219,6 +266,61 @@ struct SettingsView: View {
                     }
                 }
             }
+        }
+    }
+
+    // MARK: - Computed Properties
+
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+    }
+
+    private var buildNumber: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+    }
+
+    // MARK: - Support Actions
+
+    private func clearImageCache() {
+        URLCache.shared.removeAllCachedResponses()
+        let impact = UINotificationFeedbackGenerator()
+        impact.notificationOccurred(.success)
+    }
+
+    private func exportUserData() {
+        Task {
+            do {
+                guard let token = appState.authToken,
+                      let url = URL(string: "\(APIConfig.baseURL)/api/user/export-data") else { return }
+
+                var request = URLRequest(url: url)
+                request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+                let (data, _) = try await URLSession.shared.data(for: request)
+
+                // Share the JSON data
+                let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("mirror_ai_export.json")
+                try data.write(to: tempURL)
+
+                await MainActor.run {
+                    let activityVC = UIActivityViewController(activityItems: [tempURL], applicationActivities: nil)
+                    if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                       let rootVC = windowScene.windows.first?.rootViewController {
+                        rootVC.present(activityVC, animated: true)
+                    }
+                }
+            } catch {
+                appState.errorMessage = "Failed to export data. Please try again."
+            }
+        }
+    }
+
+    private func reportBug() {
+        let email = "support@mirrorai.app"
+        let subject = "Bug Report - Mirror AI v\(appVersion)"
+        let urlString = "mailto:\(email)?subject=\(subject.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
+        if let url = URL(string: urlString) {
+            UIApplication.shared.open(url)
         }
     }
 

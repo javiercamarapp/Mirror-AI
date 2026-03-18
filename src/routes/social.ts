@@ -35,10 +35,26 @@ social.get('/feed', async (c) => {
     // Include own posts in feed
     const allIds = [userId, ...friendIds];
 
+    // Get blocked user IDs (both directions)
+    const { data: blocks } = await supabaseAdmin
+      .from('friendships')
+      .select('requester_id, addressee_id')
+      .or(`requester_id.eq.${userId},addressee_id.eq.${userId}`)
+      .eq('status', 'blocked');
+
+    const blockedIds = new Set(
+      (blocks ?? []).map((b) =>
+        b.requester_id === userId ? b.addressee_id : b.requester_id
+      )
+    );
+
+    // Filter out blocked users from feed
+    const filteredIds = allIds.filter((id) => !blockedIds.has(id));
+
     const { data: posts, error, count } = await supabaseAdmin
       .from('social_posts')
       .select('*, user:user_profiles!user_id(full_name, avatar_url)', { count: 'exact' })
-      .in('user_id', allIds)
+      .in('user_id', filteredIds)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -479,11 +495,27 @@ social.get('/stories', async (c) => {
     const friendIds = await getFriendIds(userId);
     const allIds = [userId, ...friendIds];
 
+    // Get blocked user IDs (both directions)
+    const { data: blocks } = await supabaseAdmin
+      .from('friendships')
+      .select('requester_id, addressee_id')
+      .or(`requester_id.eq.${userId},addressee_id.eq.${userId}`)
+      .eq('status', 'blocked');
+
+    const blockedIds = new Set(
+      (blocks ?? []).map((b) =>
+        b.requester_id === userId ? b.addressee_id : b.requester_id
+      )
+    );
+
+    // Filter out blocked users from stories
+    const filteredIds = allIds.filter((id) => !blockedIds.has(id));
+
     // Get active (non-expired) stories
     const { data: stories, error } = await supabaseAdmin
       .from('stories')
       .select('*, user:user_profiles!user_id(full_name, avatar_url)')
-      .in('user_id', allIds)
+      .in('user_id', filteredIds)
       .gt('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false });
 
@@ -590,11 +622,27 @@ social.get('/rankings', async (c) => {
     const friendIds = await getFriendIds(userId);
     const allIds = [userId, ...friendIds];
 
+    // Get blocked user IDs (both directions)
+    const { data: blocks } = await supabaseAdmin
+      .from('friendships')
+      .select('requester_id, addressee_id')
+      .or(`requester_id.eq.${userId},addressee_id.eq.${userId}`)
+      .eq('status', 'blocked');
+
+    const blockedIds = new Set(
+      (blocks ?? []).map((b) =>
+        b.requester_id === userId ? b.addressee_id : b.requester_id
+      )
+    );
+
+    // Filter out blocked users from rankings
+    const filteredIds = allIds.filter((id) => !blockedIds.has(id));
+
     // For each user, calculate average outfit score from daily_outfits
     const { data: profiles } = await supabaseAdmin
       .from('user_profiles')
       .select('id, full_name, avatar_url')
-      .in('id', allIds);
+      .in('id', filteredIds);
 
     if (!profiles || profiles.length === 0) {
       return c.json({ success: true, data: [] });
@@ -604,7 +652,7 @@ social.get('/rankings', async (c) => {
     const { data: allOutfits } = await supabaseAdmin
       .from('daily_outfits')
       .select('user_id, score')
-      .in('user_id', allIds)
+      .in('user_id', filteredIds)
       .not('score', 'is', null);
 
     // Calculate per-user stats
@@ -621,7 +669,7 @@ social.get('/rankings', async (c) => {
     const { data: streakData } = await supabaseAdmin
       .from('daily_outfits')
       .select('user_id, date')
-      .in('user_id', allIds)
+      .in('user_id', filteredIds)
       .order('date', { ascending: false });
 
     // Calculate streaks per user
@@ -779,6 +827,31 @@ social.post('/block', async (c) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     console.error('[Block Error]:', err);
+    return c.json({ success: false, error: message }, 500);
+  }
+});
+
+// ─── POST /social/posts/:id/hide ─────────────────────────────────────────────
+// Hide a post from your feed without reporting.
+social.post('/posts/:id/hide', async (c) => {
+  try {
+    const userId = c.get('userId');
+    const postId = c.req.param('id');
+
+    const { error } = await supabaseAdmin
+      .from('hidden_posts')
+      .upsert(
+        { user_id: userId, post_id: postId },
+        { onConflict: 'user_id,post_id' }
+      );
+
+    if (error) {
+      return c.json({ success: false, error: error.message }, 500);
+    }
+
+    return c.json({ success: true, data: { message: 'Post hidden from your feed' } });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
     return c.json({ success: false, error: message }, 500);
   }
 });

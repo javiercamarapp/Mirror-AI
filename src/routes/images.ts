@@ -11,6 +11,70 @@ const images = new Hono<{ Variables: AppVariables }>();
 // All image routes require authentication
 images.use('*', authMiddleware);
 
+// ─── POST /images/upload ──────────────────────────────────────────────────
+// Upload an image with automatic resizing and thumbnail generation.
+// Body: { image: string (base64), bucket: string }
+// Returns { image_url: string, thumbnail_url: string }
+images.post('/upload', async (c) => {
+  try {
+    const userId = c.get('userId');
+    const body = await c.req.json<{
+      image: string; // base64
+      bucket: string;
+    }>();
+
+    if (!body.image || !body.bucket) {
+      return c.json({ success: false, error: 'image (base64) and bucket are required' }, 400);
+    }
+
+    // Validate bucket
+    const VALID_BUCKETS = ['wardrobe', 'avatars', 'outfits', 'social'] as const;
+    if (!VALID_BUCKETS.includes(body.bucket as typeof VALID_BUCKETS[number])) {
+      return c.json({ success: false, error: `Invalid bucket. Must be one of: ${VALID_BUCKETS.join(', ')}` }, 400);
+    }
+
+    // Validate image size (base64 is ~4/3 the size of the binary)
+    if (body.image.length > 10 * 1024 * 1024 * 4 / 3) {
+      return c.json({ success: false, error: 'Image exceeds maximum size of 10MB' }, 400);
+    }
+
+    // Strip data URI prefix if present
+    const base64Data = body.image.replace(/^data:image\/\w+;base64,/, '');
+    const imageBuffer = Buffer.from(base64Data, 'base64');
+
+    const fileId = uuidv4();
+    const bucket = body.bucket as typeof VALID_BUCKETS[number];
+
+    // Process through sharp: full image (max 1200px on longest side)
+    const fullBuffer = await sharp(imageBuffer)
+      .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
+      .jpeg()
+      .toBuffer();
+
+    // Generate 400px thumbnail
+    const thumbBuffer = await sharp(imageBuffer)
+      .resize(400, 400, { fit: 'inside', withoutEnlargement: true })
+      .jpeg()
+      .toBuffer();
+
+    // Upload both versions
+    const fullPath = `${userId}/${fileId}_full.jpg`;
+    const thumbPath = `${userId}/${fileId}_thumb.jpg`;
+
+    const imageUrl = await uploadImage(bucket, fullPath, fullBuffer, 'image/jpeg');
+    const thumbnailUrl = await uploadImage(bucket, thumbPath, thumbBuffer, 'image/jpeg');
+
+    return c.json({
+      success: true,
+      data: { image_url: imageUrl, thumbnail_url: thumbnailUrl },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[Upload Error]:', err);
+    return c.json({ success: false, error: message }, 500);
+  }
+});
+
 // ─── POST /images/remove-bg ────────────────────────────────────────────────
 // Remove background from image.
 // Body: { image: string (base64) }

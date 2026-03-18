@@ -389,4 +389,47 @@ user.post('/notifications/read-all', async (c) => {
   }
 });
 
+// ─── GET /user/export-data ─────────────────────────────────────────────────
+// Export all user data (GDPR/CCPA compliance).
+user.get('/export-data', async (c) => {
+  try {
+    const userId = c.get('userId');
+
+    const [
+      { data: profile },
+      { data: wardrobe },
+      { data: outfits },
+      { data: posts },
+      { data: stories },
+      { data: friends },
+      { data: notifications },
+    ] = await Promise.all([
+      supabaseAdmin.from('user_profiles').select('*').eq('id', userId).single(),
+      supabaseAdmin.from('wardrobe_items').select('*').eq('user_id', userId),
+      supabaseAdmin.from('daily_outfits').select('*').eq('user_id', userId),
+      supabaseAdmin.from('social_posts').select('*').eq('user_id', userId),
+      supabaseAdmin.from('stories').select('*').eq('user_id', userId),
+      supabaseAdmin.from('friendships').select('*').or(`requester_id.eq.${userId},addressee_id.eq.${userId}`),
+      supabaseAdmin.from('notifications').select('*').eq('user_id', userId),
+    ]);
+
+    return c.json({
+      success: true,
+      data: {
+        exported_at: new Date().toISOString(),
+        profile,
+        wardrobe_items: wardrobe ?? [],
+        daily_outfits: outfits ?? [],
+        social_posts: posts ?? [],
+        stories: stories ?? [],
+        friendships: friends ?? [],
+        notifications: notifications ?? [],
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return c.json({ success: false, error: message }, 500);
+  }
+});
+
 export { user as userRoutes };

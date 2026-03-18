@@ -3,10 +3,161 @@ import { supabaseAdmin } from '../services/supabase.js';
 import { authMiddleware } from '../middleware/auth.js';
 import type { AppVariables } from '../types/index.js';
 import { v4 as uuidv4 } from 'uuid';
+import { verifyTransaction } from '../services/appstore.js';
 
 const subscriptions = new Hono<{ Variables: AppVariables }>();
 
-// All subscription routes require authentication
+// ─── POST /subscriptions/webhooks/appstore ───────────────────────────────────
+// Apple App Store Server-to-Server notification webhook (no auth needed).
+subscriptions.post('/webhooks/appstore', async (c) => {
+  try {
+    const body = await c.req.json<{
+      notificationType: string;
+      signedTransactionInfo?: string;
+    }>();
+
+    const { notificationType, signedTransactionInfo } = body;
+
+    if (!notificationType) {
+      return c.json({ success: false, error: 'Missing notificationType' }, 400);
+    }
+
+    // Decode transaction info if provided
+    let transactionData: ReturnType<typeof verifyTransaction> | null = null;
+    if (signedTransactionInfo) {
+      transactionData = verifyTransaction(signedTransactionInfo);
+      if (!transactionData.isValid) {
+        return c.json({ success: false, error: 'Invalid transaction' }, 400);
+      }
+    }
+
+    switch (notificationType) {
+      case 'DID_RENEW': {
+        if (!transactionData?.originalTransactionId) break;
+
+        // Find subscription by original transaction id
+        const { data: sub } = await supabaseAdmin
+          .from('subscription_history')
+          .select('*')
+          .eq('transaction_id', transactionData.originalTransactionId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (sub) {
+          const newExpiry = transactionData.expiresDate ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+          // Insert new subscription record for the renewal
+          await supabaseAdmin.from('subscription_history').insert({
+            id: uuidv4(),
+            user_id: sub.user_id,
+            product_id: sub.product_id,
+            plan: sub.plan,
+            status: 'active',
+            transaction_id: transactionData.transactionId,
+            platform: 'ios',
+            expires_at: newExpiry,
+          });
+
+          // Reset credits
+          const plan = sub.plan ?? 'free';
+          const credits = CREDITS_BY_PLAN[plan] ?? 3;
+          await supabaseAdmin
+            .from('user_profiles')
+            .update({ subscription_plan: plan, vton_credits: credits })
+            .eq('id', sub.user_id);
+        }
+        break;
+      }
+
+      case 'DID_FAIL_TO_RENEW': {
+        if (!transactionData?.originalTransactionId) break;
+
+        const { data: sub } = await supabaseAdmin
+          .from('subscription_history')
+          .select('*')
+          .eq('transaction_id', transactionData.originalTransactionId)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (sub) {
+          await supabaseAdmin
+            .from('subscription_history')
+            .update({ status: 'billing_retry' })
+            .eq('id', sub.id);
+        }
+        break;
+      }
+
+      case 'EXPIRED': {
+        if (!transactionData?.originalTransactionId) break;
+
+        const { data: sub } = await supabaseAdmin
+          .from('subscription_history')
+          .select('*')
+          .eq('transaction_id', transactionData.originalTransactionId)
+          .in('status', ['active', 'billing_retry'])
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (sub) {
+          await supabaseAdmin
+            .from('subscription_history')
+            .update({ status: 'expired' })
+            .eq('id', sub.id);
+
+          // Downgrade user to free
+          await supabaseAdmin
+            .from('user_profiles')
+            .update({ subscription_plan: 'free', vton_credits: 3 })
+            .eq('id', sub.user_id);
+        }
+        break;
+      }
+
+      case 'REFUND': {
+        if (!transactionData?.transactionId) break;
+
+        const { data: sub } = await supabaseAdmin
+          .from('subscription_history')
+          .select('*')
+          .eq('transaction_id', transactionData.transactionId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (sub) {
+          await supabaseAdmin
+            .from('subscription_history')
+            .update({ status: 'refunded' })
+            .eq('id', sub.id);
+
+          // Downgrade user to free
+          await supabaseAdmin
+            .from('user_profiles')
+            .update({ subscription_plan: 'free', vton_credits: 3 })
+            .eq('id', sub.user_id);
+        }
+        break;
+      }
+
+      default:
+        // Unknown notification type — acknowledge receipt
+        break;
+    }
+
+    return c.json({ success: true });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[App Store Webhook Error]:', err);
+    return c.json({ success: false, error: message }, 500);
+  }
+});
+
+// All remaining subscription routes require authentication
 subscriptions.use('*', authMiddleware);
 
 // Plan limits
@@ -44,17 +195,38 @@ subscriptions.post('/verify', async (c) => {
       return c.json({ success: false, error: 'receipt_data and product_id are required' }, 400);
     }
 
+    // Verify the signed transaction
+    const verification = verifyTransaction(body.receipt_data);
+    if (!verification.isValid) {
+      return c.json({ success: false, error: 'Transaction verification failed' }, 400);
+    }
+
     const plan = PRODUCT_TO_PLAN[body.product_id];
     if (!plan) {
       return c.json({ success: false, error: 'Invalid product_id' }, 400);
+    }
+
+    // Check for duplicate transaction_id (idempotency)
+    if (verification.transactionId) {
+      const { data: existingSub } = await supabaseAdmin
+        .from('subscription_history')
+        .select('id')
+        .eq('transaction_id', verification.transactionId)
+        .limit(1)
+        .single();
+
+      if (existingSub) {
+        return c.json({ success: false, error: 'Transaction already processed' }, 409);
+      }
     }
 
     const newCredits = CREDITS_BY_PLAN[plan] ?? 3;
 
     // Create subscription history record
     const subscriptionId = uuidv4();
-    const expiresAt = new Date();
-    expiresAt.setMonth(expiresAt.getMonth() + 1);
+    const expiresAt = verification.expiresDate
+      ? new Date(verification.expiresDate)
+      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
     const { error: historyError } = await supabaseAdmin
       .from('subscription_history')
@@ -65,6 +237,7 @@ subscriptions.post('/verify', async (c) => {
         plan,
         status: 'active',
         receipt_data: body.receipt_data,
+        transaction_id: verification.transactionId,
         platform: body.platform ?? null,
         expires_at: expiresAt.toISOString(),
       });
@@ -325,6 +498,99 @@ subscriptions.get('/purchases/packs', async (c) => {
     return c.json({
       success: true,
       data: data ?? [],
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return c.json({ success: false, error: message }, 500);
+  }
+});
+
+// ─── GET /subscriptions/trial/status ──────────────────────────────────────────
+// Get trial status for the current user.
+subscriptions.get('/trial/status', async (c) => {
+  try {
+    const userId = c.get('userId');
+
+    const { data: profile } = await supabaseAdmin
+      .from('user_profiles')
+      .select('trial_end_date, subscription_plan, created_at')
+      .eq('id', userId)
+      .single();
+
+    if (!profile) {
+      return c.json({ success: false, error: 'Profile not found' }, 404);
+    }
+
+    let isTrialActive = false;
+    let trialDaysRemaining = 0;
+
+    if (profile.trial_end_date) {
+      const trialEnd = new Date(profile.trial_end_date);
+      const now = new Date();
+      if (trialEnd > now) {
+        isTrialActive = true;
+        trialDaysRemaining = Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      }
+    }
+
+    return c.json({
+      success: true,
+      data: {
+        is_trial_active: isTrialActive,
+        trial_days_remaining: trialDaysRemaining,
+        trial_end_date: profile.trial_end_date,
+        plan: profile.subscription_plan,
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return c.json({ success: false, error: message }, 500);
+  }
+});
+
+// ─── POST /subscriptions/trial/start ─────────────────────────────────────────
+// Start a 7-day free trial.
+subscriptions.post('/trial/start', async (c) => {
+  try {
+    const userId = c.get('userId');
+
+    const { data: profile } = await supabaseAdmin
+      .from('user_profiles')
+      .select('trial_end_date')
+      .eq('id', userId)
+      .single();
+
+    if (!profile) {
+      return c.json({ success: false, error: 'Profile not found' }, 404);
+    }
+
+    // Don't allow trial if already used
+    if (profile.trial_end_date) {
+      return c.json({ success: false, error: 'Trial has already been used' }, 400);
+    }
+
+    const trialEnd = new Date();
+    trialEnd.setDate(trialEnd.getDate() + 7);
+
+    const { error } = await supabaseAdmin
+      .from('user_profiles')
+      .update({
+        trial_end_date: trialEnd.toISOString(),
+        subscription_plan: 'basic',
+      })
+      .eq('id', userId);
+
+    if (error) {
+      return c.json({ success: false, error: error.message }, 500);
+    }
+
+    return c.json({
+      success: true,
+      data: {
+        is_trial_active: true,
+        trial_days_remaining: 7,
+        trial_end_date: trialEnd.toISOString(),
+      },
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';

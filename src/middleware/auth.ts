@@ -34,6 +34,12 @@ export async function authMiddleware(
     );
   }
 
+  // Validate UUID format
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_RE.test(user.id)) {
+    return c.json({ success: false, error: 'Invalid user ID format' }, 401);
+  }
+
   c.set('userId', user.id);
 
   await next();

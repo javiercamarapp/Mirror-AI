@@ -338,11 +338,28 @@ struct EditProfileView: View {
             "style_preferences": stylePreferences
         ]
 
-        if let avatarImage, let data = avatarImage.jpegData(compressionQuality: 0.8) {
-            updates["avatar_base64"] = data.base64EncodedString()
+        // Upload avatar image if changed
+        if let avatarImage {
+            do {
+                let avatarUrl = try await ImageUploadService.shared.uploadImage(avatarImage, bucket: "avatars")
+                updates["avatar_url"] = avatarUrl
+            } catch {
+                appState.errorMessage = "Failed to upload avatar image."
+                isSaving = false
+                return
+            }
         }
-        if let bodyImage, let data = bodyImage.jpegData(compressionQuality: 0.8) {
-            updates["body_photo_base64"] = data.base64EncodedString()
+
+        // Upload body photo if changed
+        if let bodyImage {
+            do {
+                let bodyUrl = try await ImageUploadService.shared.uploadImage(bodyImage, bucket: "avatars")
+                updates["body_photo_url"] = bodyUrl
+            } catch {
+                appState.errorMessage = "Failed to upload body photo."
+                isSaving = false
+                return
+            }
         }
 
         await appState.updateProfile(updates)

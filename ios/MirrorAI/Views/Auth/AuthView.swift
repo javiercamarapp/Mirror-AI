@@ -6,6 +6,9 @@ struct AuthView: View {
     @State private var isAnimating = false
     @State private var showPrivacyPolicy = false
     @State private var showTermsOfService = false
+    @State private var showEmailAuth = false
+    @State private var emailInput = ""
+    @State private var emailAuthSent = false
 
     var body: some View {
         ZStack {
@@ -49,6 +52,9 @@ struct AuthView: View {
         }
         .sheet(isPresented: $showTermsOfService) {
             termsOfServiceSheet
+        }
+        .sheet(isPresented: $showEmailAuth) {
+            emailAuthSheet
         }
     }
 
@@ -397,6 +403,101 @@ struct AuthView: View {
 
     // MARK: - Auth Handlers
 
+    private var emailAuthSheet: some View {
+        NavigationStack {
+            VStack(spacing: 24) {
+                if emailAuthSent {
+                    // Confirmation state
+                    VStack(spacing: 16) {
+                        Image(systemName: "envelope.badge.fill")
+                            .font(.system(size: 48))
+                            .foregroundStyle(MirrorTheme.gradientPrimary)
+
+                        Text("Check Your Email")
+                            .font(.system(size: 22, weight: .bold))
+
+                        Text("We sent a magic link to **\(emailInput)**. Tap the link in the email to sign in.")
+                            .font(.system(size: 15))
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 24)
+                    }
+                    .padding(.top, 40)
+                } else {
+                    // Email input state
+                    VStack(spacing: 16) {
+                        Image(systemName: "envelope.fill")
+                            .font(.system(size: 40))
+                            .foregroundStyle(MirrorTheme.gradientPrimary)
+
+                        Text("Sign in with Email")
+                            .font(.system(size: 22, weight: .bold))
+
+                        Text("We'll send you a magic link to sign in — no password needed.")
+                            .font(.system(size: 15))
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 24)
+                    }
+                    .padding(.top, 40)
+
+                    TextField("your@email.com", text: $emailInput)
+                        .keyboardType(.emailAddress)
+                        .textContentType(.emailAddress)
+                        .autocapitalization(.none)
+                        .disableAutocorrection(true)
+                        .font(.system(size: 17))
+                        .padding(16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(Color(UIColor.secondarySystemBackground))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .strokeBorder(Color(UIColor.separator), lineWidth: 1)
+                                )
+                        )
+                        .padding(.horizontal, 24)
+
+                    Button {
+                        Task {
+                            await appState.signInWithEmail(email: emailInput)
+                            emailAuthSent = true
+                        }
+                    } label: {
+                        Text("Send Magic Link")
+                            .font(.system(size: 17, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 54)
+                            .background(
+                                RoundedRectangle(cornerRadius: MirrorTheme.buttonRadius)
+                                    .fill(
+                                        emailInput.contains("@")
+                                            ? AnyShapeStyle(MirrorTheme.gradientPrimary)
+                                            : AnyShapeStyle(Color.gray.opacity(0.3))
+                                    )
+                            )
+                    }
+                    .disabled(!emailInput.contains("@") || appState.isLoading)
+                    .padding(.horizontal, 24)
+                }
+
+                Spacer()
+            }
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") {
+                        showEmailAuth = false
+                        emailAuthSent = false
+                        emailInput = ""
+                    }
+                }
+            }
+        }
+    }
+
     private func handleAppleSignIn(_ result: Result<ASAuthorization, Error>) {
         switch result {
         case .success(let authorization):
@@ -406,8 +507,17 @@ struct AuthView: View {
                 return
             }
 
+            // Capture full name (Apple only sends it on first sign-in)
+            var fullName: String? = nil
+            if let nameComponents = appleIDCredential.fullName {
+                let given = nameComponents.givenName ?? ""
+                let family = nameComponents.familyName ?? ""
+                let name = "\(given) \(family)".trimmingCharacters(in: .whitespaces)
+                if !name.isEmpty { fullName = name }
+            }
+
             Task {
-                await appState.setAuthToken(tokenString)
+                await appState.signInWithApple(idToken: tokenString, fullName: fullName)
             }
 
         case .failure(let error):
@@ -416,14 +526,15 @@ struct AuthView: View {
     }
 
     private func handleGoogleSignIn() {
-        // Google Sign-In integration placeholder
-        // In production, use GoogleSignIn SDK
         let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
         impactFeedback.impactOccurred()
+        // Google Sign-In requires GoogleSignIn SDK - will be enabled in a future update
+        appState.errorMessage = "Google Sign-In will be available in a future update. Please use Apple Sign-In or Email."
     }
 
     private func handleEmailSignIn() {
         let impactFeedback = UIImpactFeedbackGenerator(style: .light)
         impactFeedback.impactOccurred()
+        showEmailAuth = true
     }
 }

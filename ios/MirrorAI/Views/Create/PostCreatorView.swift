@@ -366,12 +366,28 @@ struct PostCreatorView: View {
         isPostingAsPost = true
 
         Task {
-            // In production, upload image to get URL first
-            let imageUrl = prefilledImageUrl ?? "uploaded_image_url"
+            var imageUrl = prefilledImageUrl
+
+            // Upload selected image if present
+            if let image = selectedImage {
+                do {
+                    imageUrl = try await ImageUploadService.shared.uploadImage(image, bucket: "social")
+                } catch {
+                    isPostingAsPost = false
+                    appState.errorMessage = "Failed to upload image. Please try again."
+                    return
+                }
+            }
+
+            guard let finalImageUrl = imageUrl else {
+                isPostingAsPost = false
+                appState.errorMessage = "No image to upload."
+                return
+            }
 
             await appState.createPost(
                 type: "outfit",
-                imageUrl: imageUrl,
+                imageUrl: finalImageUrl,
                 caption: caption,
                 occasion: occasionTag.isEmpty ? nil : occasionTag
             )
@@ -392,10 +408,27 @@ struct PostCreatorView: View {
         isPostingAsStory = true
 
         Task {
-            let imageUrl = prefilledImageUrl ?? "uploaded_image_url"
+            var imageUrl = prefilledImageUrl
+
+            // Upload selected image if present
+            if let image = selectedImage {
+                do {
+                    imageUrl = try await ImageUploadService.shared.uploadImage(image, bucket: "social")
+                } catch {
+                    isPostingAsStory = false
+                    appState.errorMessage = "Failed to upload image. Please try again."
+                    return
+                }
+            }
+
+            guard let finalImageUrl = imageUrl else {
+                isPostingAsStory = false
+                appState.errorMessage = "No image to upload."
+                return
+            }
 
             await appState.createStory(
-                imageUrl: imageUrl,
+                imageUrl: finalImageUrl,
                 caption: caption.isEmpty ? nil : caption
             )
 

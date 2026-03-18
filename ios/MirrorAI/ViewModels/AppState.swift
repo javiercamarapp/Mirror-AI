@@ -36,7 +36,7 @@ class AppState {
     var styleTier: String = "Bronze"
 
     // ─── Feed Pagination ─────────────────────────────────────────────────
-    var feedOffset: Int = 0
+    var feedPage: Int = 1
     var feedHasMore: Bool = true
 
     // ─── Notifications ───────────────────────────────────────────────────
@@ -108,7 +108,7 @@ class AppState {
         feedLoading = false
         styleScore = 0
         styleTier = "Bronze"
-        feedOffset = 0
+        feedPage = 1
         feedHasMore = true
         notifications = []
         unreadNotificationCount = 0
@@ -117,6 +117,7 @@ class AppState {
         errorMessage = nil
 
         _ = KeychainManager.delete(forKey: tokenKey)
+        _ = KeychainManager.delete(forKey: "mirror_ai_refresh_token")
         Task {
             await network.setAuthToken(nil)
         }
@@ -126,11 +127,63 @@ class AppState {
 
     /// Refresh the auth token if needed (called when app becomes active).
     func refreshTokenIfNeeded() async {
-        guard let token = authToken else { return }
-        // Re-apply token to network layer in case session was invalidated
-        await network.setAuthToken(token)
-        // Reload profile to verify token is still valid
-        await loadProfile()
+        guard authToken != nil else { return }
+        guard let refreshToken = KeychainManager.retrieve(forKey: "mirror_ai_refresh_token") else {
+            // No refresh token, just re-apply existing token
+            await network.setAuthToken(authToken)
+            await loadProfile()
+            return
+        }
+
+        do {
+            guard let url = URL(string: APIConfig.baseURL + "/api/auth/refresh") else { return }
+
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["refresh_token": refreshToken])
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200...299).contains(httpResponse.statusCode) else {
+                // Refresh failed - logout
+                logout()
+                return
+            }
+
+            struct RefreshResponse: Decodable {
+                let accessToken: String
+                let refreshToken: String
+                let expiresAt: Int?
+
+                enum CodingKeys: String, CodingKey {
+                    case accessToken = "access_token"
+                    case refreshToken = "refresh_token"
+                    case expiresAt = "expires_at"
+                }
+            }
+
+            let decoder = JSONDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            let apiResponse = try decoder.decode(APIResponse<RefreshResponse>.self, from: data)
+
+            guard apiResponse.success, let refreshData = apiResponse.data else {
+                logout()
+                return
+            }
+
+            // Update tokens
+            _ = KeychainManager.save(refreshData.refreshToken, forKey: "mirror_ai_refresh_token")
+            authToken = refreshData.accessToken
+            _ = KeychainManager.save(refreshData.accessToken, forKey: tokenKey)
+            await network.setAuthToken(refreshData.accessToken)
+
+        } catch {
+            // On any error, try to keep going with existing token
+            await network.setAuthToken(authToken)
+            await loadProfile()
+        }
     }
 
     /// Persist any transient state before the app goes to the background.
@@ -139,6 +192,103 @@ class AppState {
         // Persist lightweight UI state in UserDefaults.
         UserDefaults.standard.set(streakCount, forKey: "mirror_ai_streak_count")
         UserDefaults.standard.set(styleScore, forKey: "mirror_ai_style_score")
+    }
+
+    // MARK: - Authentication
+
+    func signInWithApple(idToken: String, fullName: String?) async {
+        isLoading = true
+        defer { isLoading = false }
+
+        do {
+            struct AuthResponse: Decodable {
+                let accessToken: String
+                let refreshToken: String
+                let expiresAt: Int?
+                let user: AuthUser?
+
+                enum CodingKeys: String, CodingKey {
+                    case accessToken = "access_token"
+                    case refreshToken = "refresh_token"
+                    case expiresAt = "expires_at"
+                    case user
+                }
+            }
+
+            struct AuthUser: Decodable {
+                let id: String
+                let email: String?
+                let name: String?
+            }
+
+            var body: [String: Any] = ["id_token": idToken]
+            if let fullName = fullName { body["full_name"] = fullName }
+
+            // Call backend without auth token (this is a login endpoint)
+            guard let url = URL(string: APIConfig.baseURL + "/api/auth/apple") else {
+                handleError(APIError.invalidURL, context: "Apple sign in")
+                return
+            }
+
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200...299).contains(httpResponse.statusCode) else {
+                let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+                throw APIError.httpError(statusCode: code, message: "Authentication failed")
+            }
+
+            let decoder = JSONDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            let apiResponse = try decoder.decode(APIResponse<AuthResponse>.self, from: data)
+
+            guard apiResponse.success, let authData = apiResponse.data else {
+                throw APIError.apiResponseError(apiResponse.error ?? "Authentication failed")
+            }
+
+            // Store refresh token separately in Keychain
+            _ = KeychainManager.save(authData.refreshToken, forKey: "mirror_ai_refresh_token")
+
+            // Set the access token (triggers profile load etc.)
+            await setAuthToken(authData.accessToken)
+
+        } catch {
+            handleError(error, context: "Apple sign in")
+        }
+    }
+
+    func signInWithEmail(email: String) async {
+        isLoading = true
+        defer { isLoading = false }
+
+        do {
+            guard let url = URL(string: APIConfig.baseURL + "/api/auth/magic-link") else {
+                handleError(APIError.invalidURL, context: "email sign in")
+                return
+            }
+
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["email": email])
+
+            let (_, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200...299).contains(httpResponse.statusCode) else {
+                let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+                throw APIError.httpError(statusCode: code, message: "Failed to send magic link")
+            }
+
+            // Success - UI should show confirmation
+        } catch {
+            handleError(error, context: "email sign in")
+        }
     }
 
     // MARK: - Profile
@@ -438,8 +588,8 @@ class AppState {
         defer { feedLoading = false }
 
         do {
-            let offset = append ? feedOffset : 0
-            let posts = try await socialService.getFeed(offset: offset)
+            let page = append ? feedPage : 1
+            let posts = try await socialService.getFeed(page: page)
             let models = posts.map { $0.toModel() }
 
             if append {
@@ -448,7 +598,7 @@ class AppState {
                 feedPosts = models
             }
 
-            feedOffset = (append ? feedOffset : 0) + models.count
+            feedPage = (append ? feedPage : 1) + (models.isEmpty ? 0 : 1)
             feedHasMore = !models.isEmpty
         } catch {
             handleError(error, context: "loading feed")
