@@ -88,6 +88,13 @@ class StoreKitManager: ObservableObject {
                 do {
                     let transaction = try await self.checkVerified(result)
                     await transaction.finish()
+
+                    // Verify with backend for transaction updates
+                    if let product = await self.subscriptions.first(where: { $0.id == transaction.productID })
+                        ?? await self.creditPacks.first(where: { $0.id == transaction.productID }) {
+                        await self.verifyWithBackend(transaction: transaction, product: product)
+                    }
+
                     await self.updateSubscriptionStatus()
                 } catch {
                     print("Transaction failed verification: \(error)")

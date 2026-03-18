@@ -192,7 +192,10 @@ extension FriendProfile {
             username: username,
             avatarUrl: avatarUrl,
             styleScore: styleScore,
-            streakCount: streakCount
+            streakCount: streakCount,
+            stylePreferences: nil,
+            friendshipId: nil,
+            friendsSince: nil
         )
     }
 }
@@ -216,7 +219,8 @@ extension UserSearchResult {
             username: username,
             avatarUrl: avatarUrl,
             styleScore: styleScore,
-            friendshipStatus: friendshipStatus
+            friendshipStatus: friendshipStatus,
+            friendshipId: nil
         )
     }
 }
