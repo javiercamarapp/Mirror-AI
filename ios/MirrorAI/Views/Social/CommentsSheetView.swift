@@ -320,6 +320,156 @@ struct CommentsSheetView: View {
         }
     }
 
+    // MARK: - Report & Block
+
+    private var commentReportSheet: some View {
+        NavigationStack {
+            VStack(spacing: 24) {
+                Text("Why are you reporting this comment?")
+                    .font(.system(size: 18, weight: .bold))
+                    .padding(.top, 8)
+
+                VStack(spacing: 0) {
+                    ForEach(ReportReason.allCases, id: \.self) { reason in
+                        Button {
+                            selectedReportReason = reason
+                        } label: {
+                            HStack {
+                                Text(reason.displayName)
+                                    .font(.system(size: 15))
+                                    .foregroundStyle(.primary)
+                                Spacer()
+                                if selectedReportReason == reason {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(MirrorTheme.purple)
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 14)
+                        }
+
+                        if reason != ReportReason.allCases.last {
+                            Divider().padding(.leading, 16)
+                        }
+                    }
+                }
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(.ultraThinMaterial)
+                )
+
+                Button {
+                    submitCommentReport()
+                } label: {
+                    HStack {
+                        if isSubmittingReport {
+                            ProgressView()
+                                .controlSize(.small)
+                                .tint(.white)
+                        }
+                        Text(isSubmittingReport ? "Submitting..." : "Submit Report")
+                            .font(.system(size: 17, weight: .bold))
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(Color.red)
+                    )
+                }
+                .disabled(isSubmittingReport)
+
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            .navigationTitle("Report Comment")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Cancel") { showReportSheet = false }
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+
+    private func submitCommentReport() {
+        guard let commentId = reportTargetCommentId else { return }
+        isSubmittingReport = true
+
+        Task {
+            do {
+                let url = URL(string: "\(APIConfig.baseURL)/api/social/report")!
+                var request = URLRequest(url: url)
+                request.httpMethod = "POST"
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                if let token = appState.authToken {
+                    request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                }
+                let body: [String: String] = ["commentId": commentId, "reason": selectedReportReason.rawValue]
+                request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+                let (_, response) = try await URLSession.shared.data(for: request)
+                guard let httpResponse = response as? HTTPURLResponse,
+                      (200...299).contains(httpResponse.statusCode) else {
+                    throw URLError(.badServerResponse)
+                }
+
+                await MainActor.run {
+                    isSubmittingReport = false
+                    showReportSheet = false
+                    let impact = UINotificationFeedbackGenerator()
+                    impact.notificationOccurred(.success)
+                }
+            } catch {
+                await MainActor.run {
+                    isSubmittingReport = false
+                    showReportSheet = false
+                    errorMessage = "Failed to submit report. Please try again."
+                    showError = true
+                }
+            }
+        }
+    }
+
+    private func blockCommentUser() {
+        guard let userId = reportTargetUserId else { return }
+        let impact = UIImpactFeedbackGenerator(style: .heavy)
+        impact.impactOccurred()
+
+        Task {
+            do {
+                let url = URL(string: "\(APIConfig.baseURL)/api/social/block")!
+                var request = URLRequest(url: url)
+                request.httpMethod = "POST"
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                if let token = appState.authToken {
+                    request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                }
+                let body: [String: String] = ["userId": userId]
+                request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+                let (_, response) = try await URLSession.shared.data(for: request)
+                guard let httpResponse = response as? HTTPURLResponse,
+                      (200...299).contains(httpResponse.statusCode) else {
+                    throw URLError(.badServerResponse)
+                }
+
+                await MainActor.run {
+                    let notification = UINotificationFeedbackGenerator()
+                    notification.notificationOccurred(.success)
+                    comments.removeAll { $0.userId == userId }
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = "Failed to block user. Please try again."
+                    showError = true
+                }
+            }
+        }
+    }
+
     // MARK: - Helpers
 
     private func avatarView(url: String?, size: CGFloat) -> some View {
