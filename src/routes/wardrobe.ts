@@ -36,6 +36,9 @@ wardrobe.get('/', async (c) => {
       query = query.eq('category', category);
     }
     if (color) {
+      if (color.length > 50) {
+        return c.json({ success: false, error: 'Color filter must be 50 characters or less' }, 400);
+      }
       query = query.ilike('color', `%${color}%`);
     }
     if (season) {
@@ -91,6 +94,12 @@ wardrobe.post('/', async (c) => {
 
     if (!body.image) {
       return c.json({ success: false, error: 'image (base64) is required' }, 400);
+    }
+
+    // Validate image size (max 10MB base64)
+    const maxBase64Size = 10 * 1024 * 1024 * 4 / 3; // ~13.3MB base64 for 10MB binary
+    if (body.image.length > maxBase64Size) {
+      return c.json({ success: false, error: 'Image exceeds maximum size of 10MB' }, 400);
     }
 
     // Check wardrobe limit based on subscription
@@ -455,6 +464,44 @@ wardrobe.post('/:id/wear', async (c) => {
         wear_count: (item.wear_count ?? 0) + 1,
         last_worn: new Date().toISOString(),
       })
+      .eq('id', itemId)
+      .eq('user_id', userId)
+      .select()
+      .single();
+
+    if (error) {
+      return c.json({ success: false, error: error.message }, 500);
+    }
+
+    return c.json({ success: true, data });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return c.json({ success: false, error: message }, 500);
+  }
+});
+
+// ─── POST /wardrobe/:id/favorite ─────────────────────────────────────────────
+// Toggle is_favorite on a wardrobe item.
+wardrobe.post('/:id/favorite', async (c) => {
+  try {
+    const userId = c.get('userId');
+    const itemId = c.req.param('id');
+
+    // Fetch current is_favorite
+    const { data: item, error: fetchError } = await supabaseAdmin
+      .from('wardrobe_items')
+      .select('is_favorite')
+      .eq('id', itemId)
+      .eq('user_id', userId)
+      .single();
+
+    if (fetchError || !item) {
+      return c.json({ success: false, error: 'Item not found' }, 404);
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('wardrobe_items')
+      .update({ is_favorite: !item.is_favorite })
       .eq('id', itemId)
       .eq('user_id', userId)
       .select()

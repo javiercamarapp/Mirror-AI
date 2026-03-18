@@ -40,10 +40,19 @@ async function removeBackgroundExternal(imageBuffer: Buffer): Promise<Buffer> {
   const blob = new Blob([new Uint8Array(imageBuffer)], { type: 'image/png' });
   formData.append('image', blob, 'image.png');
 
-  const response = await fetch(config.birefnetApiUrl, {
-    method: 'POST',
-    body: formData,
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+
+  let response: Response;
+  try {
+    response = await fetch(config.birefnetApiUrl, {
+      method: 'POST',
+      body: formData,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!response.ok) {
     const errorBody = await response.text();
@@ -61,7 +70,7 @@ async function removeBackgroundExternal(imageBuffer: Buffer): Promise<Buffer> {
   }
 
   // If the API returns JSON with base64 data
-  const data = await response.json();
+  const data = await response.json() as { image?: string; output?: string | string[] };
   if (data.image) {
     return Buffer.from(data.image, 'base64');
   }

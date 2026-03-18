@@ -28,13 +28,59 @@ app.use('*', logger());
 app.use(
   '*',
   cors({
-    origin: '*',
+    origin: process.env.ALLOWED_ORIGINS?.split(',') || ['*'],
     allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization'],
     exposeHeaders: ['Content-Length'],
     maxAge: 86400,
   })
 );
+
+// ─── Security Headers ─────────────────────────────────────────────────────────
+
+app.use('*', async (c, next) => {
+  await next();
+  c.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  c.header('X-Content-Type-Options', 'nosniff');
+  c.header('X-Frame-Options', 'DENY');
+  c.header('X-XSS-Protection', '1; mode=block');
+});
+
+// ─── Rate Limiter ─────────────────────────────────────────────────────────────
+
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+
+function getRateLimitKey(ip: string, isAuth: boolean): string {
+  return isAuth ? `auth:${ip}` : `general:${ip}`;
+}
+
+app.use('*', async (c, next) => {
+  const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+  const isAuth = c.req.path.startsWith('/api/auth');
+  const key = getRateLimitKey(ip, isAuth);
+  const maxRequests = isAuth ? 10 : 100;
+  const windowMs = 15 * 60 * 1000; // 15 minutes
+  const now = Date.now();
+
+  const entry = rateLimitMap.get(key);
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(key, { count: 1, resetAt: now + windowMs });
+  } else {
+    entry.count++;
+    if (entry.count > maxRequests) {
+      return c.json({ success: false, error: 'Too many requests' }, 429);
+    }
+  }
+
+  // Periodically clean up expired entries
+  if (Math.random() < 0.01) {
+    for (const [k, v] of rateLimitMap) {
+      if (now > v.resetAt) rateLimitMap.delete(k);
+    }
+  }
+
+  await next();
+});
 
 // ─── Health Check ────────────────────────────────────────────────────────────
 

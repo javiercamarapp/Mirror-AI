@@ -87,30 +87,42 @@ export async function startTryOn(
 }
 
 /**
- * Check the status of a prediction.
+ * Check the status of a prediction. Retries up to 2 times on 5xx errors.
  */
 export async function checkStatus(
   predictionId: string
 ): Promise<{ status: string; output?: string[]; error?: string }> {
-  const response = await fetch(`${BASE_URL}/status/${predictionId}`, {
-    method: 'GET',
-    headers: headers(),
-  });
+  const maxRetries = 2;
 
-  if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(
-      `Fashn /status failed (${response.status}): ${errorBody.slice(0, 300)}`
-    );
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const response = await fetch(`${BASE_URL}/status/${predictionId}`, {
+      method: 'GET',
+      headers: headers(),
+    });
+
+    if (response.status >= 500 && attempt < maxRetries) {
+      const delay = 1000 * Math.pow(2, attempt);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      continue;
+    }
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new Error(
+        `Fashn /status failed (${response.status}): ${errorBody.slice(0, 300)}`
+      );
+    }
+
+    const data: StatusResponse = await response.json();
+
+    return {
+      status: data.status,
+      output: data.output,
+      error: data.error,
+    };
   }
 
-  const data: StatusResponse = await response.json();
-
-  return {
-    status: data.status,
-    output: data.output,
-    error: data.error,
-  };
+  throw new Error(`Fashn /status failed after ${maxRetries} retries for prediction ${predictionId}`);
 }
 
 /**
@@ -123,8 +135,10 @@ export async function waitForResult(
   predictionId: string,
   maxWait = 120
 ): Promise<string> {
-  const pollInterval = 3000;
+  const initialInterval = 2000;
+  const maxInterval = 15000;
   const deadline = Date.now() + maxWait * 1000;
+  let pollInterval = initialInterval;
 
   while (Date.now() < deadline) {
     const result = await checkStatus(predictionId);
@@ -142,6 +156,7 @@ export async function waitForResult(
     }
 
     await new Promise((resolve) => setTimeout(resolve, pollInterval));
+    pollInterval = Math.min(pollInterval * 2, maxInterval);
   }
 
   throw new Error(`Fashn prediction timed out after ${maxWait}s (id: ${predictionId})`);

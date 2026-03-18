@@ -28,6 +28,11 @@ outfits.post('/generate', async (c) => {
       return c.json({ success: false, error: 'occasion is required' }, 400);
     }
 
+    const validOccasions: Occasion[] = ['casual', 'work', 'formal', 'date', 'party', 'sport', 'travel', 'beach'];
+    if (!validOccasions.includes(body.occasion)) {
+      return c.json({ success: false, error: `Invalid occasion. Must be one of: ${validOccasions.join(', ')}` }, 400);
+    }
+
     // Fetch user profile for context
     const { data: profile } = await supabaseAdmin
       .from('user_profiles')
@@ -488,12 +493,49 @@ outfits.get('/saved', async (c) => {
   }
 });
 
+// ─── GET /outfits/:id ──────────────────────────────────────────────────────
+// Get a single saved outfit.
+outfits.get('/:id', async (c) => {
+  try {
+    const userId = c.get('userId');
+    const outfitId = c.req.param('id');
+
+    const { data, error } = await supabaseAdmin
+      .from('outfits')
+      .select('*')
+      .eq('id', outfitId)
+      .eq('user_id', userId)
+      .single();
+
+    if (error || !data) {
+      return c.json({ success: false, error: 'Outfit not found' }, 404);
+    }
+
+    return c.json({ success: true, data });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return c.json({ success: false, error: message }, 500);
+  }
+});
+
 // ─── DELETE /outfits/:id ────────────────────────────────────────────────────
 // Delete a saved outfit.
 outfits.delete('/:id', async (c) => {
   try {
     const userId = c.get('userId');
     const outfitId = c.req.param('id');
+
+    // Verify ownership before deleting
+    const { data: existing } = await supabaseAdmin
+      .from('outfits')
+      .select('id')
+      .eq('id', outfitId)
+      .eq('user_id', userId)
+      .single();
+
+    if (!existing) {
+      return c.json({ success: false, error: 'Outfit not found' }, 404);
+    }
 
     const { error } = await supabaseAdmin
       .from('outfits')
@@ -502,7 +544,7 @@ outfits.delete('/:id', async (c) => {
       .eq('user_id', userId);
 
     if (error) {
-      return c.json({ success: false, error: 'Outfit not found or delete failed' }, 404);
+      return c.json({ success: false, error: 'Failed to delete outfit' }, 500);
     }
 
     return c.json({ success: true, data: { message: 'Outfit deleted successfully' } });

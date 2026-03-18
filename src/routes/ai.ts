@@ -39,6 +39,10 @@ ai.post('/chat', async (c) => {
       return c.json({ success: false, error: 'message is required' }, 400);
     }
 
+    if (body.message.length > 2000) {
+      return c.json({ success: false, error: 'Message must be 2000 characters or less' }, 400);
+    }
+
     // Fetch user profile for context
     const { data: profile } = await supabaseAdmin
       .from('user_profiles')

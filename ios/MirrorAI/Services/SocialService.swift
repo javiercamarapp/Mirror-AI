@@ -48,36 +48,10 @@ class SocialService {
             bodyDict["outfit_data"] = outfitData
         }
 
-        guard let token = await network.getAuthToken() else {
-            throw APIError.noAuthToken
-        }
-
-        guard let url = URL(string: APIConfig.baseURL + APIConfig.Endpoints.socialPosts) else {
-            throw APIError.invalidURL
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.httpBody = try JSONSerialization.data(withJSONObject: bodyDict)
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
-            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
-            throw APIError.httpError(statusCode: statusCode, message: "Failed to create post")
-        }
-
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        let apiResponse = try decoder.decode(APIResponse<SocialPostResponse>.self, from: data)
-
-        guard apiResponse.success, let post = apiResponse.data else {
-            throw APIError.apiResponseError(apiResponse.error ?? "Failed to create post")
-        }
+        let post: SocialPostResponse = try await network.post(
+            APIConfig.Endpoints.socialPosts,
+            body: bodyDict
+        )
 
         return post
     }
@@ -154,36 +128,10 @@ class SocialService {
             bodyDict["outfit_data"] = outfitData
         }
 
-        guard let token = await network.getAuthToken() else {
-            throw APIError.noAuthToken
-        }
-
-        guard let url = URL(string: APIConfig.baseURL + APIConfig.Endpoints.socialStories) else {
-            throw APIError.invalidURL
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.httpBody = try JSONSerialization.data(withJSONObject: bodyDict)
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
-            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
-            throw APIError.httpError(statusCode: statusCode, message: "Failed to create story")
-        }
-
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        let apiResponse = try decoder.decode(APIResponse<StoryResponse>.self, from: data)
-
-        guard apiResponse.success, let story = apiResponse.data else {
-            throw APIError.apiResponseError(apiResponse.error ?? "Failed to create story")
-        }
+        let story: StoryResponse = try await network.post(
+            APIConfig.Endpoints.socialStories,
+            body: bodyDict
+        )
 
         return story
     }

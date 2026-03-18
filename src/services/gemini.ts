@@ -49,7 +49,7 @@ const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1000;
 
 async function callGemini(request: GeminiRequest): Promise<string> {
-  const url = `${BASE_URL}:generateContent?key=${config.geminiApiKey}`;
+  const url = `${BASE_URL}:generateContent`;
 
   let lastError: Error | null = null;
 
@@ -59,33 +59,44 @@ async function callGemini(request: GeminiRequest): Promise<string> {
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(request),
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
 
-    if (response.status === 429 && attempt < MAX_RETRIES) {
-      lastError = new Error(`Gemini rate limited (429). Attempt ${attempt + 1}/${MAX_RETRIES}.`);
-      continue;
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': config.geminiApiKey,
+        },
+        body: JSON.stringify(request),
+        signal: controller.signal,
+      });
+
+      if (response.status === 429 && attempt < MAX_RETRIES) {
+        lastError = new Error(`Gemini rate limited (429). Attempt ${attempt + 1}/${MAX_RETRIES}.`);
+        continue;
+      }
+
+      if (!response.ok) {
+        throw new Error(`Gemini API request failed with status ${response.status}`);
+      }
+
+      const data: GeminiResponse = await response.json();
+
+      if (data.error) {
+        throw new Error(`Gemini API error [${data.error.code}]: ${data.error.message}`);
+      }
+
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text === undefined || text === null) {
+        throw new Error('Gemini returned no content in response');
+      }
+
+      return text;
+    } finally {
+      clearTimeout(timeout);
     }
-
-    const data: GeminiResponse = await response.json();
-
-    if (data.error) {
-      throw new Error(`Gemini API error [${data.error.code}]: ${data.error.message}`);
-    }
-
-    if (!response.ok) {
-      throw new Error(`Gemini API request failed with status ${response.status}`);
-    }
-
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (text === undefined || text === null) {
-      throw new Error('Gemini returned no content in response');
-    }
-
-    return text;
   }
 
   throw lastError ?? new Error('Gemini request failed after retries');

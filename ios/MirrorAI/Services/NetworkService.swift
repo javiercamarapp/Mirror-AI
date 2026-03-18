@@ -121,6 +121,31 @@ actor NetworkService {
         return data
     }
 
+    // MARK: - Convenience Methods
+
+    func get<T: Decodable>(_ endpoint: String, queryParams: [String: String]? = nil) async throws -> T {
+        var fullEndpoint = endpoint
+        if let params = queryParams, !params.isEmpty {
+            let queryString = params.map { "\($0.key)=\($0.value)" }.joined(separator: "&")
+            fullEndpoint += "?\(queryString)"
+        }
+        return try await apiRequest(fullEndpoint)
+    }
+
+    func post<T: Decodable>(_ endpoint: String, body: [String: Any]) async throws -> T {
+        let encodableBody = body.mapValues { AnyCodable($0) }
+        return try await apiRequest(endpoint, method: "POST", body: encodableBody)
+    }
+
+    func patch<T: Decodable>(_ endpoint: String, body: [String: Any]) async throws -> T {
+        let encodableBody = body.mapValues { AnyCodable($0) }
+        return try await apiRequest(endpoint, method: "PATCH", body: encodableBody)
+    }
+
+    func delete<T: Decodable>(_ endpoint: String) async throws -> T {
+        return try await apiRequest(endpoint, method: "DELETE")
+    }
+
     // MARK: - Upload Image as Base64
 
     func uploadImageBase64(

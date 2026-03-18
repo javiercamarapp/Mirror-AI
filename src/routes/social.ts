@@ -320,13 +320,20 @@ social.post('/posts/:id/comments', async (c) => {
       return c.json({ success: false, error: 'content is required' }, 400);
     }
 
+    if (body.content.length > 500) {
+      return c.json({ success: false, error: 'Comment must be 500 characters or less' }, 400);
+    }
+
+    // Sanitize: strip HTML tags
+    const sanitizedContent = body.content.trim().replace(/<[^>]*>/g, '');
+
     const { data: comment, error } = await supabaseAdmin
       .from('post_comments')
       .insert({
         id: uuidv4(),
         post_id: postId,
         user_id: userId,
-        content: body.content.trim(),
+        content: sanitizedContent,
       })
       .select('*, user:user_profiles!user_id(full_name, avatar_url)')
       .single();

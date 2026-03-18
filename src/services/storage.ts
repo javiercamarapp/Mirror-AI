@@ -3,6 +3,39 @@ import { config } from '../config.js';
 
 export type StorageBucket = 'wardrobe' | 'avatars' | 'outfits' | 'social';
 
+const ALLOWED_BUCKETS: ReadonlySet<string> = new Set<StorageBucket>([
+  'wardrobe',
+  'avatars',
+  'outfits',
+  'social',
+]);
+
+const ALLOWED_CONTENT_TYPES: ReadonlySet<string> = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'image/svg+xml',
+]);
+
+function validatePath(path: string): void {
+  if (path.includes('..') || path.startsWith('/')) {
+    throw new Error(`Invalid storage path: ${path}`);
+  }
+}
+
+function validateBucket(bucket: string): void {
+  if (!ALLOWED_BUCKETS.has(bucket)) {
+    throw new Error(`Invalid storage bucket: ${bucket}`);
+  }
+}
+
+function validateContentType(contentType: string): void {
+  if (!ALLOWED_CONTENT_TYPES.has(contentType)) {
+    throw new Error(`Invalid content type: ${contentType}. Allowed: ${[...ALLOWED_CONTENT_TYPES].join(', ')}`);
+  }
+}
+
 /**
  * Uploads a file to the specified Supabase Storage bucket.
  * Returns the public URL of the uploaded file.
@@ -13,6 +46,10 @@ export async function uploadImage(
   buffer: Buffer,
   contentType: string
 ): Promise<string> {
+  validateBucket(bucket);
+  validatePath(path);
+  validateContentType(contentType);
+
   const { error } = await supabaseAdmin.storage
     .from(bucket)
     .upload(path, buffer, {
@@ -34,6 +71,9 @@ export async function deleteImage(
   bucket: StorageBucket,
   path: string
 ): Promise<void> {
+  validateBucket(bucket);
+  validatePath(path);
+
   const { error } = await supabaseAdmin.storage.from(bucket).remove([path]);
 
   if (error) {
