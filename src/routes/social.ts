@@ -689,4 +689,98 @@ social.get('/rankings', async (c) => {
   }
 });
 
+// ─── POST /social/report ──────────────────────────────────────────────────
+// Report content for moderation.
+social.post('/report', async (c) => {
+  try {
+    const userId = c.get('userId');
+    const body = await c.req.json<{
+      content_type: string;
+      content_id: string;
+      reason: string;
+      description?: string;
+    }>();
+
+    if (!body.content_type || !body.content_id || !body.reason) {
+      return c.json({ success: false, error: 'content_type, content_id, and reason are required' }, 400);
+    }
+
+    const validTypes = ['post', 'comment', 'story', 'user'];
+    if (!validTypes.includes(body.content_type)) {
+      return c.json({ success: false, error: `content_type must be one of: ${validTypes.join(', ')}` }, 400);
+    }
+
+    const { data: report, error } = await supabaseAdmin
+      .from('content_reports')
+      .insert({
+        id: uuidv4(),
+        reporter_id: userId,
+        content_type: body.content_type,
+        content_id: body.content_id,
+        reason: body.reason,
+        description: body.description ?? null,
+        status: 'pending',
+      })
+      .select()
+      .single();
+
+    if (error) {
+      return c.json({ success: false, error: error.message }, 500);
+    }
+
+    return c.json({ success: true, data: report }, 201);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[Report Error]:', err);
+    return c.json({ success: false, error: message }, 500);
+  }
+});
+
+// ─── POST /social/block ──────────────────────────────────────────────────
+// Block a user.
+social.post('/block', async (c) => {
+  try {
+    const userId = c.get('userId');
+    const body = await c.req.json<{
+      blocked_user_id: string;
+    }>();
+
+    if (!body.blocked_user_id) {
+      return c.json({ success: false, error: 'blocked_user_id is required' }, 400);
+    }
+
+    if (body.blocked_user_id === userId) {
+      return c.json({ success: false, error: 'You cannot block yourself' }, 400);
+    }
+
+    // Remove any existing friendship between the two users
+    await supabaseAdmin
+      .from('friendships')
+      .delete()
+      .or(`and(requester_id.eq.${userId},addressee_id.eq.${body.blocked_user_id}),and(requester_id.eq.${body.blocked_user_id},addressee_id.eq.${userId})`);
+
+    // Insert blocked relationship
+    const { data: block, error } = await supabaseAdmin
+      .from('friendships')
+      .insert({
+        id: uuidv4(),
+        requester_id: userId,
+        addressee_id: body.blocked_user_id,
+        status: 'blocked',
+      })
+      .select()
+      .single();
+
+    if (error) {
+      return c.json({ success: false, error: error.message }, 500);
+    }
+
+    return c.json({ success: true, data: { message: 'User blocked successfully' } }, 201);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[Block Error]:', err);
+    return c.json({ success: false, error: message }, 500);
+  }
+});
+
 export { social as socialRoutes };

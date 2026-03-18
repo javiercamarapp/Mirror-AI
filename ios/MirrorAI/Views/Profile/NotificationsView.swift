@@ -3,6 +3,7 @@ import SwiftUI
 struct NotificationsView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
+    @State private var isLoading = true
     @State private var appearAnimation = false
 
     private var todayNotifications: [NotificationModel] {
@@ -18,7 +19,15 @@ struct NotificationsView: View {
             ZStack {
                 Color(UIColor.systemBackground).ignoresSafeArea()
 
-                if appState.notifications.isEmpty {
+                if isLoading {
+                    VStack {
+                        Spacer()
+                        ProgressView()
+                            .tint(MirrorTheme.purple)
+                            .scaleEffect(1.2)
+                        Spacer()
+                    }
+                } else if appState.notifications.isEmpty {
                     EmptyStateView(
                         icon: "bell.slash",
                         title: "No Notifications",
@@ -63,6 +72,7 @@ struct NotificationsView: View {
             }
             .task {
                 await appState.loadNotifications()
+                isLoading = false
                 withAnimation(.easeOut(duration: 0.3)) { appearAnimation = true }
             }
         }

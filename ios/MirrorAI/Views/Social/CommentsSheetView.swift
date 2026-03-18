@@ -13,6 +13,12 @@ struct CommentsSheetView: View {
     @State private var showError = false
     @State private var errorMessage = ""
     @FocusState private var isInputFocused: Bool
+    @State private var showReportSheet = false
+    @State private var showBlockAlert = false
+    @State private var reportTargetCommentId: String?
+    @State private var reportTargetUserId: String?
+    @State private var selectedReportReason: ReportReason = .spam
+    @State private var isSubmittingReport = false
 
     var body: some View {
         NavigationStack {
@@ -48,6 +54,17 @@ struct CommentsSheetView: View {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(errorMessage)
+            }
+            .sheet(isPresented: $showReportSheet) {
+                commentReportSheet
+            }
+            .alert("Block User", isPresented: $showBlockAlert) {
+                Button("Cancel", role: .cancel) {}
+                Button("Block", role: .destructive) {
+                    blockCommentUser()
+                }
+            } message: {
+                Text("You will no longer see content from this user. They will not be notified.")
             }
         }
     }
@@ -143,14 +160,37 @@ struct CommentsSheetView: View {
 
             Spacer(minLength: 0)
 
-            // Heart icon
-            Button {
-                let impact = UIImpactFeedbackGenerator(style: .light)
-                impact.impactOccurred()
-            } label: {
-                Image(systemName: "heart")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.tertiary)
+            VStack(spacing: 8) {
+                // Heart icon
+                Button {
+                    let impact = UIImpactFeedbackGenerator(style: .light)
+                    impact.impactOccurred()
+                } label: {
+                    Image(systemName: "heart")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.tertiary)
+                }
+
+                Menu {
+                    Button(role: .destructive) {
+                        reportTargetCommentId = comment.id
+                        reportTargetUserId = comment.userId
+                        showReportSheet = true
+                    } label: {
+                        Label("Report Comment", systemImage: "exclamationmark.triangle")
+                    }
+
+                    Button(role: .destructive) {
+                        reportTargetUserId = comment.userId
+                        showBlockAlert = true
+                    } label: {
+                        Label("Block User", systemImage: "hand.raised")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
+                }
             }
             .padding(.top, 4)
         }
