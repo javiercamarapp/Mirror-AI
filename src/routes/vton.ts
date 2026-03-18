@@ -38,27 +38,20 @@ vton.post('/generate', async (c) => {
       return c.json({ success: false, error: 'category must be one of: tops, bottoms, one-pieces' }, 400);
     }
 
-    // Check user credits
-    const { data: credits } = await supabaseAdmin
-      .from('vton_credits')
-      .select('credits_remaining')
-      .eq('user_id', userId)
+    // Check user credits and get body photo
+    const { data: profile } = await supabaseAdmin
+      .from('user_profiles')
+      .select('vton_credits, body_photo_url')
+      .eq('id', userId)
       .single();
 
-    if (!credits || credits.credits_remaining <= 0) {
+    if (!profile || (profile.vton_credits ?? 0) <= 0) {
       return c.json({
         success: false,
         error: 'No virtual try-on credits remaining. Upgrade your plan for more credits.',
         data: { credits_remaining: 0 },
       }, 403);
     }
-
-    // Get user's body photo
-    const { data: profile } = await supabaseAdmin
-      .from('profiles')
-      .select('body_photo_url')
-      .eq('id', userId)
-      .single();
 
     if (!profile?.body_photo_url) {
       return c.json({
@@ -89,18 +82,18 @@ vton.post('/generate', async (c) => {
     }
 
     // Decrement credit
+    const newCredits = (profile.vton_credits ?? 1) - 1;
     await supabaseAdmin
-      .from('vton_credits')
-      .update({ credits_remaining: credits.credits_remaining - 1 })
-      .eq('user_id', userId);
+      .from('user_profiles')
+      .update({ vton_credits: newCredits })
+      .eq('id', userId);
 
     // Log usage in history
-    await supabaseAdmin.from('vton_history').insert({
+    await supabaseAdmin.from('vton_usage').insert({
       id: uuidv4(),
       user_id: userId,
-      garment_image_url: body.garment_image_url,
+      garment_item_id: null,
       result_image_url: storedUrl,
-      category: body.category,
       credits_used: 1,
     });
 
@@ -108,7 +101,7 @@ vton.post('/generate', async (c) => {
       success: true,
       data: {
         result_image_url: storedUrl,
-        credits_remaining: credits.credits_remaining - 1,
+        credits_remaining: newCredits,
       },
     });
   } catch (err) {
@@ -124,26 +117,19 @@ vton.get('/credits', async (c) => {
   try {
     const userId = c.get('userId');
 
-    const [creditsRes, profileRes] = await Promise.all([
-      supabaseAdmin
-        .from('vton_credits')
-        .select('credits_remaining')
-        .eq('user_id', userId)
-        .single(),
-      supabaseAdmin
-        .from('profiles')
-        .select('subscription_plan')
-        .eq('id', userId)
-        .single(),
-    ]);
+    const { data: profileData } = await supabaseAdmin
+      .from('user_profiles')
+      .select('subscription_plan, vton_credits')
+      .eq('id', userId)
+      .single();
 
-    const plan = profileRes.data?.subscription_plan ?? 'free';
+    const plan = profileData?.subscription_plan ?? 'free';
     const maxCredits = CREDITS_BY_PLAN[plan] ?? 3;
 
     return c.json({
       success: true,
       data: {
-        credits_remaining: creditsRes.data?.credits_remaining ?? 0,
+        credits_remaining: profileData?.vton_credits ?? 0,
         credits_total: maxCredits,
         plan,
       },
@@ -164,7 +150,7 @@ vton.get('/history', async (c) => {
     const offset = (page - 1) * limit;
 
     const { data, error, count } = await supabaseAdmin
-      .from('vton_history')
+      .from('vton_usage')
       .select('*', { count: 'exact' })
       .eq('user_id', userId)
       .order('created_at', { ascending: false })

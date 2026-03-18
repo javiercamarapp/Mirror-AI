@@ -95,7 +95,7 @@ wardrobe.post('/', async (c) => {
 
     // Check wardrobe limit based on subscription
     const { data: profile } = await supabaseAdmin
-      .from('profiles')
+      .from('user_profiles')
       .select('subscription_plan')
       .eq('id', userId)
       .single();

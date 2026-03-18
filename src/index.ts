@@ -13,6 +13,8 @@ import { vtonRoutes } from './routes/vton.js';
 import { imageRoutes } from './routes/images.js';
 import { socialRoutes } from './routes/social.js';
 import { friendsRoutes } from './routes/friends.js';
+import { subscriptionRoutes } from './routes/subscriptions.js';
+import { avatarRoutes } from './routes/avatar.js';
 
 // Validate required env vars before anything else
 validateConfig();
@@ -56,6 +58,8 @@ app.route('/api/vton', vtonRoutes);
 app.route('/api/images', imageRoutes);
 app.route('/api/social', socialRoutes);
 app.route('/api/friends', friendsRoutes);
+app.route('/api/subscriptions', subscriptionRoutes);
+app.route('/api/avatar', avatarRoutes);
 
 // ─── 404 Fallback ────────────────────────────────────────────────────────────
 

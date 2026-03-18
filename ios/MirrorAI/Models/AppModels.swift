@@ -537,6 +537,100 @@ struct FriendshipResponse: Codable {
     }
 }
 
+// MARK: - Avatar
+
+struct AvatarModel: Identifiable, Codable {
+    let id: String
+    let userId: String
+    var baseImageUrl: String?
+    var style: String
+    var skinTone: String?
+    var hairStyle: String?
+    var bodyType: String?
+    var customizations: [String: AnyCodable]?
+    var isPremium: Bool
+    let createdAt: String
+    var updatedAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, style
+        case userId = "user_id"
+        case baseImageUrl = "base_image_url"
+        case skinTone = "skin_tone"
+        case hairStyle = "hair_style"
+        case bodyType = "body_type"
+        case customizations
+        case isPremium = "is_premium"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+}
+
+struct AvatarRenderModel: Identifiable, Codable {
+    let id: String
+    let userId: String
+    let avatarId: String?
+    var outfitItemIds: [String]?
+    var renderUrl: String
+    var style: String?
+    let createdAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, style
+        case userId = "user_id"
+        case avatarId = "avatar_id"
+        case outfitItemIds = "outfit_item_ids"
+        case renderUrl = "render_url"
+        case createdAt = "created_at"
+    }
+}
+
+// MARK: - Credit Packs
+
+struct CreditPackModel: Identifiable, Codable {
+    let id: String
+    let name: String
+    let credits: Int
+    let priceUsd: Double
+    let productId: String
+    let isActive: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, credits
+        case priceUsd = "price_usd"
+        case productId = "product_id"
+        case isActive = "is_active"
+    }
+}
+
+struct CreditPurchaseResponse: Codable {
+    let creditsAdded: Int
+    let newBalance: Int
+
+    enum CodingKeys: String, CodingKey {
+        case creditsAdded = "credits_added"
+        case newBalance = "new_balance"
+    }
+}
+
+// MARK: - Subscription Status
+
+struct SubscriptionStatusModel: Codable {
+    let plan: String
+    let isActive: Bool
+    let expiresAt: String?
+    let limits: PlanLimits?
+    let vtonCreditsRemaining: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case plan
+        case isActive = "is_active"
+        case expiresAt = "expires_at"
+        case limits
+        case vtonCreditsRemaining = "vton_credits_remaining"
+    }
+}
+
 // MARK: - AnyCodable (for arbitrary JSON fields)
 
 struct AnyCodable: Codable, Hashable {

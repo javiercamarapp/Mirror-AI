@@ -34,7 +34,7 @@ export type Occasion =
 
 export interface UserProfile {
   id: string;
-  name: string;
+  full_name: string;
   email: string;
   avatar_url: string | null;
   gender: string | null;
@@ -157,6 +157,67 @@ export interface VTONUsage {
   credits_used: number;
   result_image_url: string;
   created_at: string;
+}
+
+// ─── Monetization & Avatar Models ────────────────────────────────────────────
+
+export type AvatarStyle = 'realistic' | 'anime' | 'cartoon' | '3d' | 'fashion_sketch';
+
+export interface Purchase {
+  id: string;
+  user_id: string;
+  product_id: string;
+  transaction_id: string | null;
+  receipt_data: string | null;
+  platform: string;
+  amount: number | null;
+  currency: string;
+  status: string;
+  created_at: string;
+}
+
+export interface SubscriptionHistory {
+  id: string;
+  user_id: string;
+  plan: SubscriptionPlan;
+  started_at: string;
+  expires_at: string | null;
+  receipt_data: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface UserAvatar {
+  id: string;
+  user_id: string;
+  base_image_url: string | null;
+  style: AvatarStyle;
+  skin_tone: string | null;
+  hair_style: string | null;
+  body_type: string | null;
+  customizations: Record<string, unknown>;
+  is_premium: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AvatarRender {
+  id: string;
+  user_id: string;
+  avatar_id: string;
+  outfit_item_ids: string[];
+  render_url: string;
+  style: string;
+  created_at: string;
+}
+
+export interface CreditPack {
+  id: string;
+  name: string;
+  credits: number;
+  price_usd: number;
+  product_id: string;
+  is_active: boolean;
 }
 
 // ─── Request / Response Types ────────────────────────────────────────────────

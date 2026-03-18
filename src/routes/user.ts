@@ -16,7 +16,7 @@ user.get('/profile', async (c) => {
     const userId = c.get('userId');
 
     const { data, error } = await supabaseAdmin
-      .from('profiles')
+      .from('user_profiles')
       .select('*')
       .eq('id', userId)
       .single();
@@ -40,7 +40,7 @@ user.patch('/profile', async (c) => {
 
     // Only allow specific fields to be updated
     const allowedFields = [
-      'name',
+      'full_name',
       'avatar_url',
       'gender',
       'age_range',
@@ -64,7 +64,7 @@ user.patch('/profile', async (c) => {
     }
 
     const { data, error } = await supabaseAdmin
-      .from('profiles')
+      .from('user_profiles')
       .update(sanitized)
       .eq('id', userId)
       .select()
@@ -101,7 +101,7 @@ user.post('/onboarding', async (c) => {
       onboarding_completed: true,
     };
 
-    if (body.name) profileUpdate.name = body.name;
+    if (body.name) profileUpdate.full_name = body.name;
     if (body.gender) profileUpdate.gender = body.gender;
     if (body.age_range) profileUpdate.age_range = body.age_range;
     if (body.body_shape) profileUpdate.body_shape = body.body_shape;
@@ -112,7 +112,7 @@ user.post('/onboarding', async (c) => {
     if (body.color_season) profileUpdate.color_season = body.color_season;
 
     const { data, error } = await supabaseAdmin
-      .from('profiles')
+      .from('user_profiles')
       .update(profileUpdate)
       .eq('id', userId)
       .select()
@@ -135,20 +135,14 @@ user.get('/subscription', async (c) => {
     const userId = c.get('userId');
 
     const { data: profile, error } = await supabaseAdmin
-      .from('profiles')
-      .select('subscription_plan')
+      .from('user_profiles')
+      .select('subscription_plan, vton_credits')
       .eq('id', userId)
       .single();
 
     if (error || !profile) {
       return c.json({ success: false, error: 'Profile not found' }, 404);
     }
-
-    const { data: credits } = await supabaseAdmin
-      .from('vton_credits')
-      .select('credits_remaining')
-      .eq('user_id', userId)
-      .single();
 
     const planLimits: Record<string, { wardrobe_limit: number; vton_credits_monthly: number; ai_chats_daily: number }> = {
       free: { wardrobe_limit: 50, vton_credits_monthly: 3, ai_chats_daily: 10 },
@@ -161,7 +155,7 @@ user.get('/subscription', async (c) => {
       data: {
         plan: profile.subscription_plan,
         limits: planLimits[profile.subscription_plan] ?? planLimits.free,
-        vton_credits_remaining: credits?.credits_remaining ?? 0,
+        vton_credits_remaining: profile.vton_credits ?? 0,
       },
     });
   } catch (err) {
@@ -201,7 +195,7 @@ user.post('/avatar', async (c) => {
     }
 
     const { data, error } = await supabaseAdmin
-      .from('profiles')
+      .from('user_profiles')
       .update(updates)
       .eq('id', userId)
       .select()
@@ -230,7 +224,7 @@ user.get('/stats', async (c) => {
         .select('id', { count: 'exact', head: true })
         .eq('user_id', userId),
       supabaseAdmin
-        .from('saved_outfits')
+        .from('outfits')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', userId),
       supabaseAdmin

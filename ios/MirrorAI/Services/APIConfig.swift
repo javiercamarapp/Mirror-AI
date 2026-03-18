@@ -58,6 +58,12 @@ enum APIConfig {
         static let socialStories = "/api/social/stories"
         static let socialRankings = "/api/social/rankings"
 
+        // Avatar
+        static let avatar = "/api/avatar"
+
+        // Subscriptions
+        static let subscriptions = "/api/subscriptions"
+
         // Friends
         static let friends = "/api/friends"
         static let friendsRequest = "/api/friends/request"

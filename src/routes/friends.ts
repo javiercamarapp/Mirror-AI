@@ -34,8 +34,8 @@ friends.get('/', async (c) => {
     );
 
     const { data: profiles } = await supabaseAdmin
-      .from('profiles')
-      .select('id, name, avatar_url, style_preferences')
+      .from('user_profiles')
+      .select('id, full_name, avatar_url, style_preferences')
       .in('id', friendIds);
 
     // Map friendship IDs to profiles for easy unfriending
@@ -72,9 +72,9 @@ friends.post('/request', async (c) => {
     // Look up by username if no user_id provided
     if (!targetId && body.username) {
       const { data: targetUser } = await supabaseAdmin
-        .from('profiles')
+        .from('user_profiles')
         .select('id')
-        .ilike('name', body.username)
+        .ilike('full_name', body.username)
         .limit(1)
         .single();
 
@@ -94,7 +94,7 @@ friends.post('/request', async (c) => {
 
     // Verify the target user exists
     const { data: targetExists } = await supabaseAdmin
-      .from('profiles')
+      .from('user_profiles')
       .select('id')
       .eq('id', targetId)
       .single();
@@ -142,8 +142,8 @@ friends.post('/request', async (c) => {
 
     // Notify the target user
     const { data: requester } = await supabaseAdmin
-      .from('profiles')
-      .select('name')
+      .from('user_profiles')
+      .select('full_name')
       .eq('id', userId)
       .single();
 
@@ -151,7 +151,7 @@ friends.post('/request', async (c) => {
       id: uuidv4(),
       user_id: targetId,
       type: 'friend_request',
-      title: `${requester?.name ?? 'Someone'} sent you a friend request`,
+      title: `${requester?.full_name ?? 'Someone'} sent you a friend request`,
       body: 'Accept to share outfits and see each other\'s wardrobes',
       data: { friendship_id: request.id, requester_id: userId },
       read: false,
@@ -189,8 +189,8 @@ friends.get('/requests', async (c) => {
     // Enrich with requester profile info
     const requesterIds = requests.map((r) => r.requester_id);
     const { data: profiles } = await supabaseAdmin
-      .from('profiles')
-      .select('id, name, avatar_url')
+      .from('user_profiles')
+      .select('id, full_name, avatar_url')
       .in('id', requesterIds);
 
     const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]));
@@ -229,8 +229,8 @@ friends.post('/accept/:id', async (c) => {
 
     // Notify the requester
     const { data: accepter } = await supabaseAdmin
-      .from('profiles')
-      .select('name')
+      .from('user_profiles')
+      .select('full_name')
       .eq('id', userId)
       .single();
 
@@ -238,7 +238,7 @@ friends.post('/accept/:id', async (c) => {
       id: uuidv4(),
       user_id: data.requester_id,
       type: 'friend_accepted',
-      title: `${accepter?.name ?? 'Someone'} accepted your friend request`,
+      title: `${accepter?.full_name ?? 'Someone'} accepted your friend request`,
       body: 'You can now share outfits and view each other\'s wardrobes',
       data: { friendship_id: data.id },
       read: false,
@@ -314,10 +314,10 @@ friends.get('/search', async (c) => {
     }
 
     const { data: users, error } = await supabaseAdmin
-      .from('profiles')
-      .select('id, name, avatar_url')
+      .from('user_profiles')
+      .select('id, full_name, avatar_url')
       .neq('id', userId)
-      .ilike('name', `%${query}%`)
+      .ilike('full_name', `%${query}%`)
       .limit(20);
 
     if (error) {
@@ -453,7 +453,7 @@ friends.get('/:id/outfits', async (c) => {
     // Get their social posts (outfit shares)
     const { data: posts, error, count } = await supabaseAdmin
       .from('social_posts')
-      .select('*, user:profiles!user_id(name, avatar_url)', { count: 'exact' })
+      .select('*, user:user_profiles!user_id(full_name, avatar_url)', { count: 'exact' })
       .eq('user_id', friendId)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
@@ -468,7 +468,7 @@ friends.get('/:id/outfits', async (c) => {
 
     if (postIds.length > 0) {
       const { data: userLikes } = await supabaseAdmin
-        .from('likes')
+        .from('post_likes')
         .select('post_id')
         .eq('user_id', userId)
         .in('post_id', postIds);

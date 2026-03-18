@@ -41,7 +41,7 @@ ai.post('/chat', async (c) => {
 
     // Fetch user profile for context
     const { data: profile } = await supabaseAdmin
-      .from('profiles')
+      .from('user_profiles')
       .select('*')
       .eq('id', userId)
       .single();
@@ -59,7 +59,7 @@ ai.post('/chat', async (c) => {
 
     const userContext = `
 User Profile:
-- Name: ${profile?.name ?? 'Unknown'}
+- Name: ${profile?.full_name ?? 'Unknown'}
 - Gender: ${profile?.gender ?? 'not specified'}
 - Age Range: ${profile?.age_range ?? 'not specified'}
 - Body Shape: ${profile?.body_shape ?? 'not specified'}
@@ -115,7 +115,7 @@ ai.post('/analyze-outfit', async (c) => {
 
     // Fetch user profile for context
     const { data: profile } = await supabaseAdmin
-      .from('profiles')
+      .from('user_profiles')
       .select('gender, body_shape, skin_tone, style_preferences')
       .eq('id', userId)
       .single();
@@ -218,7 +218,7 @@ Return JSON with:
 
     // Save color season to user profile
     await supabaseAdmin
-      .from('profiles')
+      .from('user_profiles')
       .update({
         skin_tone: analysis.skin_undertone,
       })
@@ -301,7 +301,7 @@ ai.post('/shopping-recs', async (c) => {
 
     // Fetch user profile
     const { data: profile } = await supabaseAdmin
-      .from('profiles')
+      .from('user_profiles')
       .select('*')
       .eq('id', userId)
       .single();

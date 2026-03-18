@@ -21,7 +21,7 @@ auth.post('/signup', async (c) => {
     }
 
     const { data: existing } = await supabaseAdmin
-      .from('profiles')
+      .from('user_profiles')
       .select('id')
       .eq('id', body.id)
       .single();
@@ -31,15 +31,16 @@ auth.post('/signup', async (c) => {
     }
 
     const { data, error } = await supabaseAdmin
-      .from('profiles')
+      .from('user_profiles')
       .insert({
         id: body.id,
         email: body.email,
-        name: body.name,
+        full_name: body.name,
         avatar_url: body.avatar_url ?? null,
         style_preferences: [],
         subscription_plan: 'free',
         onboarding_completed: false,
+        vton_credits: 3,
       })
       .select()
       .single();
@@ -47,12 +48,6 @@ auth.post('/signup', async (c) => {
     if (error) {
       return c.json({ success: false, error: error.message }, 500);
     }
-
-    // Initialize VTON credits for new user
-    await supabaseAdmin.from('vton_credits').insert({
-      user_id: body.id,
-      credits_remaining: 3, // free tier default
-    });
 
     return c.json({ success: true, data }, 201);
   } catch (err) {
@@ -85,25 +80,21 @@ auth.post('/callback', async (c) => {
 
     // Ensure profile exists
     const { data: profile } = await supabaseAdmin
-      .from('profiles')
+      .from('user_profiles')
       .select('id')
       .eq('id', user.id)
       .single();
 
     if (!profile) {
-      await supabaseAdmin.from('profiles').insert({
+      await supabaseAdmin.from('user_profiles').insert({
         id: user.id,
         email: user.email ?? '',
-        name: user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? 'User',
+        full_name: user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? 'User',
         avatar_url: user.user_metadata?.avatar_url ?? null,
         style_preferences: [],
         subscription_plan: 'free',
         onboarding_completed: false,
-      });
-
-      await supabaseAdmin.from('vton_credits').insert({
-        user_id: user.id,
-        credits_remaining: 3,
+        vton_credits: 3,
       });
     }
 
@@ -171,17 +162,20 @@ auth.delete('/account', authMiddleware, async (c) => {
     const tables = [
       'story_views',
       'stories',
-      'comments',
-      'likes',
+      'post_comments',
+      'post_likes',
       'social_posts',
       'daily_outfits',
-      'saved_outfits',
-      'vton_history',
-      'vton_credits',
+      'outfits',
+      'vton_usage',
+      'avatar_renders',
+      'user_avatars',
       'notifications',
       'friendships',
       'wardrobe_items',
-      'profiles',
+      'user_avatar_data',
+      'onboarding_data',
+      'user_profiles',
     ];
 
     for (const table of tables) {

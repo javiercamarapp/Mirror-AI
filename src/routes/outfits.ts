@@ -30,7 +30,7 @@ outfits.post('/generate', async (c) => {
 
     // Fetch user profile for context
     const { data: profile } = await supabaseAdmin
-      .from('profiles')
+      .from('user_profiles')
       .select('*')
       .eq('id', userId)
       .single();
@@ -427,17 +427,16 @@ outfits.post('/save', async (c) => {
     }
 
     const { data, error } = await supabaseAdmin
-      .from('saved_outfits')
+      .from('outfits')
       .insert({
         id: uuidv4(),
         user_id: userId,
         name: body.name ?? 'Saved Outfit',
         item_ids: body.item_ids,
-        items: items,
         occasion: body.occasion ?? 'casual',
         score: body.score ?? null,
-        ai_feedback: body.ai_feedback ?? null,
-        image_url: body.image_url ?? null,
+        ai_feedback: body.ai_feedback ? { feedback: body.ai_feedback } : null,
+        collage_url: body.image_url ?? null,
       })
       .select()
       .single();
@@ -463,7 +462,7 @@ outfits.get('/saved', async (c) => {
     const offset = (page - 1) * limit;
 
     const { data, error, count } = await supabaseAdmin
-      .from('saved_outfits')
+      .from('outfits')
       .select('*', { count: 'exact' })
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
@@ -497,7 +496,7 @@ outfits.delete('/:id', async (c) => {
     const outfitId = c.req.param('id');
 
     const { error } = await supabaseAdmin
-      .from('saved_outfits')
+      .from('outfits')
       .delete()
       .eq('id', outfitId)
       .eq('user_id', userId);
@@ -530,7 +529,7 @@ outfits.post('/rate', async (c) => {
 
     // Fetch user profile for context
     const { data: profile } = await supabaseAdmin
-      .from('profiles')
+      .from('user_profiles')
       .select('gender, body_shape, skin_tone, style_preferences')
       .eq('id', userId)
       .single();

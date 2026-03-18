@@ -37,7 +37,7 @@ social.get('/feed', async (c) => {
 
     const { data: posts, error, count } = await supabaseAdmin
       .from('social_posts')
-      .select('*, user:profiles!user_id(name, avatar_url)', { count: 'exact' })
+      .select('*, user:user_profiles!user_id(full_name, avatar_url)', { count: 'exact' })
       .in('user_id', allIds)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
@@ -52,7 +52,7 @@ social.get('/feed', async (c) => {
 
     if (postIds.length > 0) {
       const { data: userLikes } = await supabaseAdmin
-        .from('likes')
+        .from('post_likes')
         .select('post_id')
         .eq('user_id', userId)
         .in('post_id', postIds);
@@ -116,7 +116,7 @@ social.post('/posts', async (c) => {
         likes_count: 0,
         comments_count: 0,
       })
-      .select('*, user:profiles!user_id(name, avatar_url)')
+      .select('*, user:user_profiles!user_id(full_name, avatar_url)')
       .single();
 
     if (error) {
@@ -127,8 +127,8 @@ social.post('/posts', async (c) => {
     const friendIds = await getFriendIds(userId);
     if (friendIds.length > 0) {
       const { data: profile } = await supabaseAdmin
-        .from('profiles')
-        .select('name')
+        .from('user_profiles')
+        .select('full_name')
         .eq('id', userId)
         .single();
 
@@ -136,7 +136,7 @@ social.post('/posts', async (c) => {
         id: uuidv4(),
         user_id: friendId,
         type: 'new_post',
-        title: `${profile?.name ?? 'Someone'} shared a new outfit`,
+        title: `${profile?.full_name ?? 'Someone'} shared a new outfit`,
         body: body.caption ?? 'Check out their new look!',
         data: { post_id: post.id },
         read: false,
@@ -162,7 +162,7 @@ social.get('/posts/:id', async (c) => {
 
     const { data: post, error } = await supabaseAdmin
       .from('social_posts')
-      .select('*, user:profiles!user_id(name, avatar_url)')
+      .select('*, user:user_profiles!user_id(full_name, avatar_url)')
       .eq('id', postId)
       .single();
 
@@ -172,7 +172,7 @@ social.get('/posts/:id', async (c) => {
 
     // Check if user has liked this post
     const { data: like } = await supabaseAdmin
-      .from('likes')
+      .from('post_likes')
       .select('id')
       .eq('post_id', postId)
       .eq('user_id', userId)
@@ -197,7 +197,7 @@ social.post('/posts/:id/like', async (c) => {
 
     // Check if already liked
     const { data: existing } = await supabaseAdmin
-      .from('likes')
+      .from('post_likes')
       .select('id')
       .eq('post_id', postId)
       .eq('user_id', userId)
@@ -205,7 +205,7 @@ social.post('/posts/:id/like', async (c) => {
 
     if (existing) {
       // Unlike: remove the like and decrement count
-      await supabaseAdmin.from('likes').delete().eq('id', existing.id);
+      await supabaseAdmin.from('post_likes').delete().eq('id', existing.id);
 
       // Decrement likes_count
       const { data: post } = await supabaseAdmin
@@ -224,7 +224,7 @@ social.post('/posts/:id/like', async (c) => {
       return c.json({ success: true, data: { liked: false } });
     } else {
       // Like: add the like and increment count
-      await supabaseAdmin.from('likes').insert({
+      await supabaseAdmin.from('post_likes').insert({
         id: uuidv4(),
         post_id: postId,
         user_id: userId,
@@ -246,8 +246,8 @@ social.post('/posts/:id/like', async (c) => {
         // Notify post author (if not self)
         if (post.user_id !== userId) {
           const { data: liker } = await supabaseAdmin
-            .from('profiles')
-            .select('name')
+            .from('user_profiles')
+            .select('full_name')
             .eq('id', userId)
             .single();
 
@@ -255,7 +255,7 @@ social.post('/posts/:id/like', async (c) => {
             id: uuidv4(),
             user_id: post.user_id,
             type: 'like',
-            title: `${liker?.name ?? 'Someone'} liked your outfit`,
+            title: `${liker?.full_name ?? 'Someone'} liked your outfit`,
             body: '',
             data: { post_id: postId },
             read: false,
@@ -282,8 +282,8 @@ social.get('/posts/:id/comments', async (c) => {
     const offset = (page - 1) * limit;
 
     const { data, error, count } = await supabaseAdmin
-      .from('comments')
-      .select('*, user:profiles!user_id(name, avatar_url)', { count: 'exact' })
+      .from('post_comments')
+      .select('*, user:user_profiles!user_id(full_name, avatar_url)', { count: 'exact' })
       .eq('post_id', postId)
       .order('created_at', { ascending: true })
       .range(offset, offset + limit - 1);
@@ -321,14 +321,14 @@ social.post('/posts/:id/comments', async (c) => {
     }
 
     const { data: comment, error } = await supabaseAdmin
-      .from('comments')
+      .from('post_comments')
       .insert({
         id: uuidv4(),
         post_id: postId,
         user_id: userId,
         content: body.content.trim(),
       })
-      .select('*, user:profiles!user_id(name, avatar_url)')
+      .select('*, user:user_profiles!user_id(full_name, avatar_url)')
       .single();
 
     if (error) {
@@ -351,8 +351,8 @@ social.post('/posts/:id/comments', async (c) => {
       // Notify post author (if not self)
       if (post.user_id !== userId) {
         const { data: commenter } = await supabaseAdmin
-          .from('profiles')
-          .select('name')
+          .from('user_profiles')
+          .select('full_name')
           .eq('id', userId)
           .single();
 
@@ -360,7 +360,7 @@ social.post('/posts/:id/comments', async (c) => {
           id: uuidv4(),
           user_id: post.user_id,
           type: 'comment',
-          title: `${commenter?.name ?? 'Someone'} commented on your outfit`,
+          title: `${commenter?.full_name ?? 'Someone'} commented on your outfit`,
           body: body.content.trim().substring(0, 100),
           data: { post_id: postId, comment_id: comment.id },
           read: false,
@@ -399,8 +399,8 @@ social.delete('/posts/:id', async (c) => {
     }
 
     // Delete associated data first
-    await supabaseAdmin.from('comments').delete().eq('post_id', postId);
-    await supabaseAdmin.from('likes').delete().eq('post_id', postId);
+    await supabaseAdmin.from('post_comments').delete().eq('post_id', postId);
+    await supabaseAdmin.from('post_likes').delete().eq('post_id', postId);
 
     // Delete the post
     const { error } = await supabaseAdmin
@@ -448,7 +448,7 @@ social.post('/stories', async (c) => {
         views_count: 0,
         expires_at: expiresAt.toISOString(),
       })
-      .select('*, user:profiles!user_id(name, avatar_url)')
+      .select('*, user:user_profiles!user_id(full_name, avatar_url)')
       .single();
 
     if (error) {
@@ -475,7 +475,7 @@ social.get('/stories', async (c) => {
     // Get active (non-expired) stories
     const { data: stories, error } = await supabaseAdmin
       .from('stories')
-      .select('*, user:profiles!user_id(name, avatar_url)')
+      .select('*, user:user_profiles!user_id(full_name, avatar_url)')
       .in('user_id', allIds)
       .gt('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false });
@@ -585,8 +585,8 @@ social.get('/rankings', async (c) => {
 
     // For each user, calculate average outfit score from daily_outfits
     const { data: profiles } = await supabaseAdmin
-      .from('profiles')
-      .select('id, name, avatar_url')
+      .from('user_profiles')
+      .select('id, full_name, avatar_url')
       .in('id', allIds);
 
     if (!profiles || profiles.length === 0) {
@@ -664,7 +664,7 @@ social.get('/rankings', async (c) => {
 
         return {
           user_id: profile.id,
-          name: profile.name,
+          name: profile.full_name,
           avatar_url: profile.avatar_url,
           average_score: avgScore,
           outfits_rated: stats?.count ?? 0,
