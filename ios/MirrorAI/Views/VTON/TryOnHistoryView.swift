@@ -52,6 +52,9 @@ struct TryOnHistoryView: View {
                         .fontWeight(.semibold)
                 }
             }
+            .refreshable {
+                await appState.loadVTONHistory()
+            }
             .fullScreenCover(item: $selectedResult) { result in
                 fullscreenResult(result)
             }

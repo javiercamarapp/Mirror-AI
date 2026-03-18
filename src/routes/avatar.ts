@@ -300,12 +300,18 @@ avatar.post('/try-outfit', async (c) => {
       console.error('Failed to persist try-outfit result to storage:', storageErr);
     }
 
-    // Decrement vton_credits
-    const newCredits = (profile.vton_credits ?? 1) - 1;
-    await supabaseAdmin
+    // Decrement vton_credits (optimistic lock to prevent race condition)
+    const { data: updatedProfile } = await supabaseAdmin
       .from('user_profiles')
-      .update({ vton_credits: newCredits })
-      .eq('id', userId);
+      .update({ vton_credits: (profile.vton_credits ?? 1) - 1 })
+      .eq('id', userId)
+      .eq('vton_credits', profile.vton_credits) // Optimistic lock
+      .select('vton_credits')
+      .single();
+    if (!updatedProfile) {
+      return c.json({ success: false, error: 'Credit update conflict, please retry' }, 409);
+    }
+    const newCredits = updatedProfile.vton_credits;
 
     // Cache in avatar_renders table
     const renderId = uuidv4();

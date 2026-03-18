@@ -7,6 +7,7 @@ struct AIStylistChatView: View {
     @State private var messages: [ChatMessage] = []
     @State private var inputText = ""
     @State private var isTyping = false
+    @State private var showClearConfirmation = false
     @FocusState private var isInputFocused: Bool
 
     struct ChatMessage: Identifiable {
@@ -47,12 +48,20 @@ struct AIStylistChatView: View {
 
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        messages.removeAll()
+                        showClearConfirmation = true
                     } label: {
                         Image(systemName: "trash")
                             .font(.system(size: 14))
                     }
                     .disabled(messages.isEmpty)
+                    .confirmationDialog("Clear Chat", isPresented: $showClearConfirmation, titleVisibility: .visible) {
+                        Button("Clear All Messages", role: .destructive) {
+                            messages.removeAll()
+                        }
+                        Button("Cancel", role: .cancel) {}
+                    } message: {
+                        Text("Are you sure you want to clear all messages? This cannot be undone.")
+                    }
                 }
             }
         }
@@ -82,6 +91,7 @@ struct AIStylistChatView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
             }
+            .scrollDismissesKeyboard(.interactively)
             .onChange(of: messages.count) { _, _ in
                 withAnimation(.spring(response: 0.3)) {
                     if let lastMessage = messages.last {

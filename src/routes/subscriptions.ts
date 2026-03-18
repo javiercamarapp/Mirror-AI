@@ -131,6 +131,23 @@ subscriptions.get('/status', async (c) => {
       .limit(1)
       .single();
 
+    // Check if subscription has expired
+    if (activeSub?.expires_at && new Date(activeSub.expires_at) < new Date()) {
+      // Subscription expired - downgrade
+      await supabaseAdmin.from('user_profiles').update({ subscription_plan: 'free', vton_credits: 3 }).eq('id', userId);
+      await supabaseAdmin.from('subscription_history').update({ status: 'expired' }).eq('id', activeSub.id);
+      return c.json({
+        success: true,
+        data: {
+          plan: 'free',
+          limits: PLAN_LIMITS.free,
+          vton_credits_remaining: 3,
+          expires_at: null,
+          active_subscription: null,
+        },
+      });
+    }
+
     return c.json({
       success: true,
       data: {

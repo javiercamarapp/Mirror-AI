@@ -42,6 +42,7 @@ struct PostCreatorView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 12)
             }
+            .scrollDismissesKeyboard(.interactively)
             .background(Color(UIColor.systemBackground))
             .navigationTitle("New Post")
             .navigationBarTitleDisplayMode(.inline)

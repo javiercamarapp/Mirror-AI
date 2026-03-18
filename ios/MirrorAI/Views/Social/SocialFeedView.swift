@@ -177,6 +177,177 @@ struct SocialFeedView: View {
             }
         }
     }
+
+    // MARK: - Report Sheet
+
+    private var reportSheet: some View {
+        NavigationStack {
+            VStack(spacing: 24) {
+                Text("Why are you reporting this post?")
+                    .font(.system(size: 18, weight: .bold))
+                    .padding(.top, 8)
+
+                VStack(spacing: 0) {
+                    ForEach(ReportReason.allCases, id: \.self) { reason in
+                        Button {
+                            selectedReportReason = reason
+                        } label: {
+                            HStack {
+                                Text(reason.displayName)
+                                    .font(.system(size: 15))
+                                    .foregroundStyle(.primary)
+                                Spacer()
+                                if selectedReportReason == reason {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(MirrorTheme.purple)
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 14)
+                        }
+
+                        if reason != ReportReason.allCases.last {
+                            Divider().padding(.leading, 16)
+                        }
+                    }
+                }
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(.ultraThinMaterial)
+                )
+
+                Button {
+                    submitReport()
+                } label: {
+                    HStack {
+                        if isSubmittingReport {
+                            ProgressView()
+                                .controlSize(.small)
+                                .tint(.white)
+                        }
+                        Text(isSubmittingReport ? "Submitting..." : "Submit Report")
+                            .font(.system(size: 17, weight: .bold))
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                    .background(
+                        RoundedRectangle(cornerRadius: MirrorTheme.buttonRadius)
+                            .fill(Color.red)
+                    )
+                }
+                .disabled(isSubmittingReport)
+
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            .navigationTitle("Report Post")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Cancel") { showReportSheet = false }
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+
+    private func submitReport() {
+        guard let postId = reportTargetPostId else { return }
+        isSubmittingReport = true
+
+        Task {
+            do {
+                let url = URL(string: "\(APIConfig.baseURL)/api/social/report")!
+                var request = URLRequest(url: url)
+                request.httpMethod = "POST"
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                if let token = appState.authToken {
+                    request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                }
+                let body: [String: String] = ["postId": postId, "reason": selectedReportReason.rawValue]
+                request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+                let (_, response) = try await URLSession.shared.data(for: request)
+                guard let httpResponse = response as? HTTPURLResponse,
+                      (200...299).contains(httpResponse.statusCode) else {
+                    throw URLError(.badServerResponse)
+                }
+
+                await MainActor.run {
+                    isSubmittingReport = false
+                    showReportSheet = false
+                    let impact = UINotificationFeedbackGenerator()
+                    impact.notificationOccurred(.success)
+                }
+            } catch {
+                await MainActor.run {
+                    isSubmittingReport = false
+                    showReportSheet = false
+                    errorMessage = "Failed to submit report. Please try again."
+                    showError = true
+                }
+            }
+        }
+    }
+
+    private func blockUser() {
+        guard let userId = reportTargetUserId else { return }
+        let impact = UIImpactFeedbackGenerator(style: .heavy)
+        impact.impactOccurred()
+
+        Task {
+            do {
+                let url = URL(string: "\(APIConfig.baseURL)/api/social/block")!
+                var request = URLRequest(url: url)
+                request.httpMethod = "POST"
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                if let token = appState.authToken {
+                    request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                }
+                let body: [String: String] = ["userId": userId]
+                request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+                let (_, response) = try await URLSession.shared.data(for: request)
+                guard let httpResponse = response as? HTTPURLResponse,
+                      (200...299).contains(httpResponse.statusCode) else {
+                    throw URLError(.badServerResponse)
+                }
+
+                await MainActor.run {
+                    let notification = UINotificationFeedbackGenerator()
+                    notification.notificationOccurred(.success)
+                    // Remove blocked user's posts from feed
+                    appState.feedPosts.removeAll { $0.userId == userId }
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = "Failed to block user. Please try again."
+                    showError = true
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Report Reason
+
+enum ReportReason: String, CaseIterable {
+    case sexualContent = "sexual_content"
+    case harassment = "harassment"
+    case spam = "spam"
+    case hateSpeech = "hate_speech"
+    case other = "other"
+
+    var displayName: String {
+        switch self {
+        case .sexualContent: return "Sexual Content"
+        case .harassment: return "Harassment"
+        case .spam: return "Spam"
+        case .hateSpeech: return "Hate Speech"
+        case .other: return "Other"
+        }
+    }
 }
 
 // MARK: - Feed Post Card
@@ -186,6 +357,8 @@ private struct FeedPostCard: View {
     let onLike: () -> Void
     let onComment: () -> Void
     let onTap: () -> Void
+    var onReport: (() -> Void)? = nil
+    var onBlock: (() -> Void)? = nil
 
     @State private var showHeartAnimation = false
     @State private var heartScale: CGFloat = 0
@@ -280,6 +453,26 @@ private struct FeedPostCard: View {
                     Capsule()
                         .fill(MirrorTheme.surfaceColor)
                 )
+            }
+
+            Menu {
+                Button(role: .destructive) {
+                    onReport?()
+                } label: {
+                    Label("Report Post", systemImage: "exclamationmark.triangle")
+                }
+
+                Button(role: .destructive) {
+                    onBlock?()
+                } label: {
+                    Label("Block User", systemImage: "hand.raised")
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 30, height: 30)
+                    .contentShape(Rectangle())
             }
         }
     }

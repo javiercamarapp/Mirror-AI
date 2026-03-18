@@ -284,12 +284,12 @@ struct VirtualTryOnView: View {
                 .frame(height: 54)
                 .background(
                     RoundedRectangle(cornerRadius: MirrorTheme.buttonRadius)
-                        .fill(appState.vtonCredits > 0
+                        .fill(appState.vtonCredits > 0 && !isGenerating
                               ? AnyShapeStyle(MirrorTheme.gradientPrimary)
                               : AnyShapeStyle(Color.gray.opacity(0.4)))
                 )
             }
-            .disabled(appState.vtonCredits <= 0)
+            .disabled(appState.vtonCredits <= 0 || isGenerating)
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
         }
@@ -300,9 +300,13 @@ struct VirtualTryOnView: View {
     // MARK: - Try On
 
     private func performTryOn() async {
-        guard let item = selectedItem else { return }
+        guard let item = selectedItem else {
+            isGenerating = false
+            return
+        }
 
         if appState.vtonCredits <= 0 {
+            isGenerating = false
             showPaywall = true
             return
         }
@@ -310,7 +314,6 @@ struct VirtualTryOnView: View {
         let impact = UIImpactFeedbackGenerator(style: .heavy)
         impact.impactOccurred()
 
-        isGenerating = true
         defer { isGenerating = false }
 
         let garmentUrl = item.imageNoBgUrl ?? item.imageUrl

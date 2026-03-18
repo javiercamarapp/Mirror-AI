@@ -81,11 +81,15 @@ images.post('/collage', async (c) => {
     const padding = 20;
 
     // SSRF protection: validate URLs against allowed domains
+    const ALLOWED_HOSTS = [
+      /\.supabase\.co$/,
+      /\.supabase\.in$/,
+    ];
     for (const url of body.item_urls) {
       try {
         const parsed = new URL(url);
-        if (!parsed.hostname.includes('supabase')) {
-          return c.json({ success: false, error: `URL not allowed: ${parsed.hostname}. Only Supabase storage URLs are permitted.` }, 400);
+        if (parsed.protocol !== 'https:' || !ALLOWED_HOSTS.some(re => re.test(parsed.hostname))) {
+          return c.json({ success: false, error: 'URL not allowed: must be HTTPS from approved storage' }, 400);
         }
       } catch {
         return c.json({ success: false, error: `Invalid URL: ${url}` }, 400);

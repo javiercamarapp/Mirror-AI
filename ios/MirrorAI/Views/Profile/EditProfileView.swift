@@ -47,6 +47,7 @@ struct EditProfileView: View {
                 .padding(.top, 16)
                 .padding(.bottom, 40)
             }
+            .scrollDismissesKeyboard(.interactively)
             .background(Color(UIColor.systemBackground))
             .navigationTitle("Edit Profile")
             .navigationBarTitleDisplayMode(.inline)
