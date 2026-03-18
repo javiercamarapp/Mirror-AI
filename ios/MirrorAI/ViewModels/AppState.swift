@@ -33,7 +33,11 @@ class AppState {
 
     // ─── Style Score ─────────────────────────────────────────────────────
     var styleScore: Double = 0
-    var styleTier: String = "Bronce"
+    var styleTier: String = "Bronze"
+
+    // ─── Feed Pagination ─────────────────────────────────────────────────
+    var feedOffset: Int = 0
+    var feedHasMore: Bool = true
 
     // ─── Notifications ───────────────────────────────────────────────────
     var notifications: [NotificationModel] = []
@@ -59,7 +63,7 @@ class AppState {
 
     /// Called on app launch -- checks persisted token, loads profile if available.
     func initialize() async {
-        if let savedToken = UserDefaults.standard.string(forKey: tokenKey) {
+        if let savedToken = KeychainManager.retrieve(forKey: tokenKey) {
             await setAuthToken(savedToken)
         }
     }
@@ -68,7 +72,7 @@ class AppState {
     func setAuthToken(_ token: String) async {
         authToken = token
         isLoggedIn = true
-        UserDefaults.standard.set(token, forKey: tokenKey)
+        _ = KeychainManager.save(token, forKey: tokenKey)
         await network.setAuthToken(token)
 
         isLoading = true
@@ -103,17 +107,38 @@ class AppState {
         stories = []
         feedLoading = false
         styleScore = 0
-        styleTier = "Bronce"
+        styleTier = "Bronze"
+        feedOffset = 0
+        feedHasMore = true
         notifications = []
         unreadNotificationCount = 0
         vtonCredits = 0
         vtonHistory = []
         errorMessage = nil
 
-        UserDefaults.standard.removeObject(forKey: tokenKey)
+        _ = KeychainManager.delete(forKey: tokenKey)
         Task {
             await network.setAuthToken(nil)
         }
+    }
+
+    // MARK: - App Lifecycle
+
+    /// Refresh the auth token if needed (called when app becomes active).
+    func refreshTokenIfNeeded() async {
+        guard let token = authToken else { return }
+        // Re-apply token to network layer in case session was invalidated
+        await network.setAuthToken(token)
+        // Reload profile to verify token is still valid
+        await loadProfile()
+    }
+
+    /// Persist any transient state before the app goes to the background.
+    func saveState() {
+        // Token is already stored in Keychain on set.
+        // Persist lightweight UI state in UserDefaults.
+        UserDefaults.standard.set(streakCount, forKey: "mirror_ai_streak_count")
+        UserDefaults.standard.set(styleScore, forKey: "mirror_ai_style_score")
     }
 
     // MARK: - Profile
@@ -408,13 +433,23 @@ class AppState {
 
     // MARK: - Social
 
-    func loadFeed() async {
+    func loadFeed(append: Bool = false) async {
         feedLoading = true
         defer { feedLoading = false }
 
         do {
-            let posts = try await socialService.getFeed()
-            feedPosts = posts.map { $0.toModel() }
+            let offset = append ? feedOffset : 0
+            let posts = try await socialService.getFeed(offset: offset)
+            let models = posts.map { $0.toModel() }
+
+            if append {
+                feedPosts.append(contentsOf: models)
+            } else {
+                feedPosts = models
+            }
+
+            feedOffset = (append ? feedOffset : 0) + models.count
+            feedHasMore = !models.isEmpty
         } catch {
             handleError(error, context: "loading feed")
         }

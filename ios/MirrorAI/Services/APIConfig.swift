@@ -1,12 +1,24 @@
 import Foundation
 
 enum APIConfig {
-    // Change this to your deployed backend URL
+    #if DEBUG
+    static let baseURL = "https://mirror-ai-backend-staging.fly.dev"
+    #else
     static let baseURL = "https://mirror-ai-backend.fly.dev"
+    #endif
 
-    // Supabase
-    static let supabaseURL = "YOUR_SUPABASE_URL"
-    static let supabaseAnonKey = "YOUR_SUPABASE_ANON_KEY"
+    // Supabase – values are read from the build environment / Info.plist at runtime.
+    static var supabaseURL: String {
+        Bundle.main.infoDictionary?["SUPABASE_URL"] as? String
+            ?? ProcessInfo.processInfo.environment["SUPABASE_URL"]
+            ?? "https://your-project.supabase.co"
+    }
+
+    static var supabaseAnonKey: String {
+        Bundle.main.infoDictionary?["SUPABASE_ANON_KEY"] as? String
+            ?? ProcessInfo.processInfo.environment["SUPABASE_ANON_KEY"]
+            ?? ""
+    }
 
     // Endpoints
     enum Endpoints {

@@ -76,15 +76,33 @@ images.post('/collage', async (c) => {
     const bgColor = body.background_color ?? '#FFFFFF';
     const padding = 20;
 
-    // Download all item images in parallel
+    // SSRF protection: validate URLs against allowed domains
+    for (const url of body.item_urls) {
+      try {
+        const parsed = new URL(url);
+        if (!parsed.hostname.includes('supabase')) {
+          return c.json({ success: false, error: `URL not allowed: ${parsed.hostname}. Only Supabase storage URLs are permitted.` }, 400);
+        }
+      } catch {
+        return c.json({ success: false, error: `Invalid URL: ${url}` }, 400);
+      }
+    }
+
+    // Download all item images in parallel (with 5s timeout)
     const downloadResults = await Promise.allSettled(
       body.item_urls.map(async (url) => {
-        const response = await fetch(url);
-        if (!response.ok) {
-          throw new Error(`Failed to download: ${url} (${response.status})`);
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000);
+        try {
+          const response = await fetch(url, { signal: controller.signal });
+          if (!response.ok) {
+            throw new Error(`Failed to download: ${url} (${response.status})`);
+          }
+          const arrayBuffer = await response.arrayBuffer();
+          return Buffer.from(arrayBuffer);
+        } finally {
+          clearTimeout(timeout);
         }
-        const arrayBuffer = await response.arrayBuffer();
-        return Buffer.from(arrayBuffer);
       })
     );
 

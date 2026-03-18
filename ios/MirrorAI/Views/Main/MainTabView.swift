@@ -21,9 +21,9 @@ struct MainTabView: View {
                 case .create:
                     NavigationStack { HomeView() } // placeholder, sheet handles create
                 case .social:
-                    NavigationStack { socialPlaceholder }
+                    NavigationStack { SocialFeedView() }
                 case .profile:
-                    NavigationStack { profilePlaceholder }
+                    NavigationStack { ProfileView() }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -192,33 +192,4 @@ struct MainTabView: View {
         }
     }
 
-    // MARK: - Placeholders for future batches
-
-    private var socialPlaceholder: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "person.2.fill")
-                .font(.system(size: 48))
-                .foregroundStyle(MirrorTheme.gradientPrimary)
-            Text("Social")
-                .font(.title2.bold())
-            Text("Coming in batch 2")
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(UIColor.systemBackground))
-    }
-
-    private var profilePlaceholder: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "person.crop.circle.fill")
-                .font(.system(size: 48))
-                .foregroundStyle(MirrorTheme.gradientPrimary)
-            Text("Profile")
-                .font(.title2.bold())
-            Text("Coming in batch 2")
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(UIColor.systemBackground))
-    }
 }

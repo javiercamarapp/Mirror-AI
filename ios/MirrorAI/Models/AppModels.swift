@@ -171,9 +171,9 @@ struct SocialPostModel: Identifiable, Codable {
     var outfitId: String?
     var occasion: String?
     var score: Double?
-    var likesCount: Int?
-    var commentsCount: Int?
-    var isLiked: Bool?
+    var likesCount: Int = 0
+    var commentsCount: Int = 0
+    var isLiked: Bool = false
     var user: PostUserInfo?
     let createdAt: String
 
@@ -210,9 +210,9 @@ struct StoryModel: Identifiable, Codable {
     var imageUrl: String
     var caption: String?
     var outfitData: [String: AnyCodable]?
-    var viewsCount: Int?
+    var viewsCount: Int = 0
     var expiresAt: String?
-    var isViewed: Bool?
+    var isViewed: Bool = false
     var user: PostUserInfo?
     let createdAt: String
 
@@ -286,6 +286,9 @@ struct FriendProfileModel: Identifiable, Codable {
     var avatarUrl: String?
     var styleScore: Double?
     var streakCount: Int?
+    var stylePreferences: [String]?
+    var friendshipId: String?
+    var friendsSince: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -294,6 +297,9 @@ struct FriendProfileModel: Identifiable, Codable {
         case avatarUrl = "avatar_url"
         case styleScore = "style_score"
         case streakCount = "streak_count"
+        case stylePreferences = "style_preferences"
+        case friendshipId = "friendship_id"
+        case friendsSince = "friends_since"
     }
 }
 
@@ -321,6 +327,7 @@ struct UserSearchResultModel: Identifiable, Codable {
     var avatarUrl: String?
     var styleScore: Double?
     var friendshipStatus: String?
+    var friendshipId: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -329,6 +336,7 @@ struct UserSearchResultModel: Identifiable, Codable {
         case avatarUrl = "avatar_url"
         case styleScore = "style_score"
         case friendshipStatus = "friendship_status"
+        case friendshipId = "friendship_id"
     }
 }
 

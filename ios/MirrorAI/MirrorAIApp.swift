@@ -3,6 +3,7 @@ import SwiftUI
 @main
 struct MirrorAIApp: App {
     @State private var appState = AppState()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
@@ -10,6 +11,20 @@ struct MirrorAIApp: App {
                 .environment(appState)
                 .preferredColorScheme(.dark)
                 .tint(Color("AccentPurple"))
+                .onChange(of: scenePhase) { _, newPhase in
+                    switch newPhase {
+                    case .active:
+                        Task {
+                            if appState.authToken != nil {
+                                await appState.refreshTokenIfNeeded()
+                            }
+                        }
+                    case .background:
+                        appState.saveState()
+                    default:
+                        break
+                    }
+                }
         }
     }
 }

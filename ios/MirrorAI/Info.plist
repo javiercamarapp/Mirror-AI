@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Mirror AI needs camera access to take photos of your outfits and selfies</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Mirror AI needs photo library access to import your outfit photos</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Mirror AI needs permission to save try-on results to your photo library</string>
+</dict>
+</plist>

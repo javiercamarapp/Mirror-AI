@@ -11,17 +11,12 @@ class FashnService {
     // MARK: - Generate Try-On
 
     func generateTryOn(garmentImageUrl: String, category: String) async throws -> TryOnResult {
-        struct TryOnRequest: Encodable {
-            let garmentImageUrl: String
-            let category: String
-        }
-
-        let body = TryOnRequest(garmentImageUrl: garmentImageUrl, category: category)
-
-        let result: TryOnResult = try await network.apiRequest(
+        let result: TryOnResult = try await network.post(
             APIConfig.Endpoints.vtonGenerate,
-            method: "POST",
-            body: body
+            body: [
+                "garment_image_url": garmentImageUrl,
+                "category": category
+            ]
         )
 
         return result
@@ -30,7 +25,7 @@ class FashnService {
     // MARK: - Get Credits
 
     func getCredits() async throws -> VTONCredits {
-        let credits: VTONCredits = try await network.apiRequest(
+        let credits: VTONCredits = try await network.get(
             APIConfig.Endpoints.vtonCredits
         )
         return credits
@@ -39,7 +34,7 @@ class FashnService {
     // MARK: - Get History
 
     func getHistory() async throws -> [VTONHistoryItem] {
-        let history: [VTONHistoryItem] = try await network.apiRequest(
+        let history: [VTONHistoryItem] = try await network.get(
             APIConfig.Endpoints.vtonHistory
         )
         return history

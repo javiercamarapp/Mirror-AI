@@ -5,6 +5,9 @@ import type { AppVariables } from '../types/index.js';
 
 const auth = new Hono<{ Variables: AppVariables }>();
 
+// Rate limiting for /auth/ routes is handled by the global rate limiter middleware
+// in index.ts (10 requests per 15 minutes for /api/auth/ paths).
+
 // ─── POST /auth/signup ────────────────────────────────────────────────────────
 // After Supabase Auth signup on the client, this creates the user profile row.
 auth.post('/signup', async (c) => {

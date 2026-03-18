@@ -265,9 +265,11 @@ struct AIStylistChatView: View {
             } label: {
                 ZStack {
                     Circle()
-                        .fill(inputText.trimmingCharacters(in: .whitespaces).isEmpty
-                              ? Color.gray.opacity(0.3)
-                              : AnyShapeStyle(MirrorTheme.gradientPrimary) as! AnyShapeStyle)
+                        .fill(
+                            inputText.trimmingCharacters(in: .whitespaces).isEmpty
+                                ? AnyShapeStyle(Color.gray.opacity(0.3))
+                                : AnyShapeStyle(MirrorTheme.gradientPrimary)
+                        )
                         .frame(width: 40, height: 40)
 
                     Image(systemName: "arrow.up")

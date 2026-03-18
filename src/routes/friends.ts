@@ -313,6 +313,10 @@ friends.get('/search', async (c) => {
       return c.json({ success: false, error: 'Query must be at least 2 characters' }, 400);
     }
 
+    if (query.length > 50) {
+      return c.json({ success: false, error: 'Query must be 50 characters or less' }, 400);
+    }
+
     const { data: users, error } = await supabaseAdmin
       .from('user_profiles')
       .select('id, full_name, avatar_url')

@@ -149,11 +149,6 @@ struct CommentsSheetView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .opacity(0)
-        .animation(.easeOut(duration: 0.3).delay(Double(index) * 0.05), value: comments.count)
-        .onAppear {
-            // Trigger animation
-        }
         .modifier(FadeInModifier(delay: Double(index) * 0.05))
     }
 

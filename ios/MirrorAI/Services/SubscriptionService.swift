@@ -4,25 +4,29 @@ class SubscriptionService {
     static let shared = SubscriptionService()
     private let network = NetworkService.shared
 
-    func verifyReceipt(receiptData: String, productId: String) async throws -> APIResponse<SubscriptionStatusModel> {
+    private init() {}
+
+    func verifyReceipt(receiptData: String, productId: String) async throws -> SubscriptionStatusModel {
         return try await network.post(
             "\(APIConfig.Endpoints.subscriptions)/verify",
             body: ["receipt_data": receiptData, "product_id": productId]
         )
     }
 
-    func getStatus() async throws -> APIResponse<SubscriptionStatusModel> {
-        return try await network.get("\(APIConfig.Endpoints.subscriptions)/status")
+    func getStatus() async throws -> SubscriptionStatusModel {
+        return try await network.get(
+            "\(APIConfig.Endpoints.subscriptions)/status"
+        )
     }
 
-    func restorePurchases(receiptData: String) async throws -> APIResponse<SubscriptionStatusModel> {
+    func restorePurchases(receiptData: String) async throws -> SubscriptionStatusModel {
         return try await network.post(
             "\(APIConfig.Endpoints.subscriptions)/restore",
             body: ["receipt_data": receiptData]
         )
     }
 
-    func purchaseCredits(productId: String, receiptData: String, transactionId: String) async throws -> APIResponse<CreditPurchaseResponse> {
+    func purchaseCredits(productId: String, receiptData: String, transactionId: String) async throws -> CreditPurchaseResponse {
         return try await network.post(
             "\(APIConfig.Endpoints.subscriptions)/purchases/credits",
             body: [
@@ -33,7 +37,9 @@ class SubscriptionService {
         )
     }
 
-    func getCreditPacks() async throws -> APIResponse<[CreditPackModel]> {
-        return try await network.get("\(APIConfig.Endpoints.subscriptions)/purchases/packs")
+    func getCreditPacks() async throws -> [CreditPackModel] {
+        return try await network.get(
+            "\(APIConfig.Endpoints.subscriptions)/purchases/packs"
+        )
     }
 }
