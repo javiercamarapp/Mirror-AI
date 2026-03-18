@@ -12,8 +12,10 @@ struct OnboardingView: View {
     @State private var selfieImage: UIImage?
     @State private var showImagePicker = false
     @State private var isSaving = false
+    @State private var selectedAgeRange: String?
+    @State private var showUnderageMessage = false
 
-    private let totalSteps = 5
+    private let totalSteps = 6
 
     var body: some View {
         ZStack {
@@ -31,11 +33,12 @@ struct OnboardingView: View {
 
                 // Content
                 TabView(selection: $currentStep) {
-                    welcomeStep.tag(0)
-                    genderStep.tag(1)
-                    bodyStep.tag(2)
-                    styleStep.tag(3)
-                    selfieStep.tag(4)
+                    ageVerificationStep.tag(0)
+                    welcomeStep.tag(1)
+                    genderStep.tag(2)
+                    bodyStep.tag(3)
+                    styleStep.tag(4)
+                    selfieStep.tag(5)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .animation(.smooth(duration: 0.4), value: currentStep)

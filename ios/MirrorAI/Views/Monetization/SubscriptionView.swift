@@ -314,14 +314,84 @@ struct SubscriptionView: View {
         }
     }
 
+    @State private var showSubscriptionPrivacyPolicy = false
+    @State private var showSubscriptionTermsOfService = false
+
     // MARK: - Legal
 
     private var legalText: some View {
-        Text("Subscriptions automatically renew unless cancelled at least 24 hours before the end of the current period. Your account will be charged for renewal within 24 hours prior to the end of the current period.")
-            .font(.system(size: 11))
-            .foregroundStyle(.tertiary)
-            .multilineTextAlignment(.center)
-            .padding(.horizontal, 16)
+        VStack(spacing: 12) {
+            Text("Payment will be charged to your iTunes Account at confirmation of purchase. Subscriptions automatically renew unless cancelled at least 24 hours before the end of the current period. Your account will be charged for renewal within 24 hours prior to the end of the current period.")
+                .font(.system(size: 11))
+                .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+
+            VStack(spacing: 6) {
+                Text("HOW TO CANCEL")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.secondary)
+
+                Text("Settings > Apple ID > Subscriptions > Mirror AI > Cancel Subscription")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                    .multilineTextAlignment(.center)
+            }
+
+            HStack(spacing: 16) {
+                Button("Terms of Service") {
+                    showSubscriptionTermsOfService = true
+                }
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(MirrorTheme.purple)
+
+                Text("|")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.tertiary)
+
+                Button("Privacy Policy") {
+                    showSubscriptionPrivacyPolicy = true
+                }
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(MirrorTheme.purple)
+            }
+        }
+        .padding(.horizontal, 16)
+        .sheet(isPresented: $showSubscriptionTermsOfService) {
+            NavigationStack {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("By using Mirror AI, you agree to our Terms of Service. Subscription plans auto-renew monthly. Payment is charged to your iTunes Account at confirmation. Cancel anytime via Settings > Apple ID > Subscriptions > Mirror AI > Cancel Subscription. No refunds for partial billing periods. We reserve the right to modify pricing with notice. See our full Terms of Service at the sign-in screen for complete details.")
+                            .font(.system(size: 14))
+                    }
+                    .padding()
+                }
+                .navigationTitle("Terms of Service")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Done") { showSubscriptionTermsOfService = false }
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showSubscriptionPrivacyPolicy) {
+            NavigationStack {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Mirror AI collects personal data including photos, style preferences, and usage data to provide AI styling services. Payment information is handled by Apple and never stored by us. We use Supabase for secure data storage and Google OAuth for authentication. You can delete your account and data at any time via Settings. We do not sell personal data to third parties. Contact privacy@mirrorai.app for questions. See our full Privacy Policy at the sign-in screen for complete details.")
+                            .font(.system(size: 14))
+                    }
+                    .padding()
+                }
+                .navigationTitle("Privacy Policy")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Done") { showSubscriptionPrivacyPolicy = false }
+                    }
+                }
+            }
+        }
     }
 
     // MARK: - Purchase
