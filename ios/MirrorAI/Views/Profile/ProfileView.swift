@@ -112,7 +112,7 @@ struct ProfileView: View {
                 await appState.loadProfile()
                 await appState.loadNotifications()
             }
-            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+            .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         }
     }
 

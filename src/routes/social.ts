@@ -59,6 +59,7 @@ social.get('/feed', async (c) => {
       .from('social_posts')
       .select('*, user:user_profiles!user_id(full_name, avatar_url)', { count: 'exact' })
       .in('user_id', filteredIds)
+      .is('deleted_at', null)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -184,6 +185,7 @@ social.get('/posts/:id', async (c) => {
       .from('social_posts')
       .select('*, user:user_profiles!user_id(full_name, avatar_url)')
       .eq('id', postId)
+      .is('deleted_at', null)
       .single();
 
     if (error || !post) {
@@ -303,6 +305,7 @@ social.get('/posts/:id/comments', async (c) => {
       .from('post_comments')
       .select('*, user:user_profiles!user_id(full_name, avatar_url)', { count: 'exact' })
       .eq('post_id', postId)
+      .is('deleted_at', null)
       .order('created_at', { ascending: true })
       .range(offset, offset + limit - 1);
 

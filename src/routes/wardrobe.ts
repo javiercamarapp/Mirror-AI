@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import sharp from 'sharp';
 import { supabaseAdmin } from '../services/supabase.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { uploadImage, deleteImage, extractPathFromUrl } from '../services/storage.js';
@@ -131,10 +132,15 @@ wardrobe.post('/', async (c) => {
       }
     }
 
-    const imageBuffer = Buffer.from(body.image, 'base64');
+    const rawImageBuffer = Buffer.from(body.image, 'base64');
+    // Strip EXIF/GPS metadata before storing
+    const imageBuffer = await sharp(rawImageBuffer)
+      .withMetadata(false)
+      .jpeg()
+      .toBuffer();
     const itemId = uuidv4();
 
-    // Upload original image
+    // Upload original image (EXIF already stripped)
     const originalPath = `${userId}/${itemId}_original.jpg`;
     const imageUrl = await uploadImage('wardrobe', originalPath, imageBuffer, 'image/jpeg');
 

@@ -47,14 +47,17 @@ images.post('/upload', async (c) => {
     const bucket = body.bucket as typeof VALID_BUCKETS[number];
 
     // Process through sharp: full image (max 1200px on longest side)
+    // .withMetadata(false) strips all EXIF/IPTC/XMP data (GPS location, camera info, etc.)
     const fullBuffer = await sharp(imageBuffer)
       .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
+      .withMetadata(false)
       .jpeg()
       .toBuffer();
 
-    // Generate 400px thumbnail
+    // Generate 400px thumbnail (also strip metadata)
     const thumbBuffer = await sharp(imageBuffer)
       .resize(400, 400, { fit: 'inside', withoutEnlargement: true })
+      .withMetadata(false)
       .jpeg()
       .toBuffer();
 
@@ -225,6 +228,7 @@ images.post('/collage', async (c) => {
           fit: 'contain',
           background: { r: 255, g: 255, b: 255, alpha: 0 },
         })
+        .withMetadata(false)
         .png()
         .toBuffer();
       resizedBuffers.push(resized);

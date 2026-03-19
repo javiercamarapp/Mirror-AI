@@ -210,6 +210,9 @@ struct SocialFeedView: View {
                             .padding(.horizontal, 16)
                             .padding(.vertical, 14)
                         }
+                        .accessibilityLabel(reason.displayName)
+                        .accessibilityValue(selectedReportReason == reason ? "Selected" : "")
+                        .accessibilityAddTraits(selectedReportReason == reason ? [.isButton, .isSelected] : .isButton)
 
                         if reason != ReportReason.allCases.last {
                             Divider().padding(.leading, 16)
@@ -242,6 +245,8 @@ struct SocialFeedView: View {
                     )
                 }
                 .disabled(isSubmittingReport)
+                .accessibilityLabel(isSubmittingReport ? "Submitting report" : "Submit report")
+                .accessibilityHint("Sends the report for this post")
 
                 Spacer()
             }
@@ -412,6 +417,8 @@ private struct FeedPostCard: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 4)
+                .accessibilityLabel("View all \(commentsCount) comments")
+                .accessibilityHint("Opens the comments sheet")
             }
 
             // Timestamp
@@ -430,6 +437,7 @@ private struct FeedPostCard: View {
         HStack(spacing: 10) {
             // Avatar
             userAvatar(url: post.user?.avatarUrl, size: 34)
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(post.user?.username ?? post.user?.fullName ?? "User")
@@ -459,6 +467,8 @@ private struct FeedPostCard: View {
                     Capsule()
                         .fill(MirrorTheme.surfaceColor)
                 )
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Style score \(String(format: "%.1f", score))")
             }
 
             Menu {

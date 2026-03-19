@@ -1,4 +1,5 @@
 import SwiftUI
+import os
 
 struct CommentsSheetView: View {
     @Environment(AppState.self) private var appState
@@ -19,6 +20,7 @@ struct CommentsSheetView: View {
     @State private var reportTargetUserId: String?
     @State private var selectedReportReason: ReportReason = .spam
     @State private var isSubmittingReport = false
+    private static let logger = Logger(subsystem: "com.mirrorai", category: "CommentsSheetView")
 
     var body: some View {
         NavigationStack {
@@ -147,7 +149,7 @@ struct CommentsSheetView: View {
                     .font(.system(size: 14))
                     .fixedSize(horizontal: false, vertical: true)
 
-                // Like button for comment
+                // Reply button for comment
                 Button {
                     let impact = UIImpactFeedbackGenerator(style: .light)
                     impact.impactOccurred()
@@ -157,6 +159,8 @@ struct CommentsSheetView: View {
                         .foregroundStyle(.secondary)
                 }
                 .padding(.top, 2)
+                .accessibilityLabel("Reply to \(comment.user?.username ?? "user")")
+                .accessibilityHint("Opens reply input")
             }
 
             Spacer(minLength: 0)
@@ -171,6 +175,7 @@ struct CommentsSheetView: View {
                         .font(.system(size: 12))
                         .foregroundStyle(.tertiary)
                 }
+                .accessibilityLabel("Like comment")
 
                 Menu {
                     Button(role: .destructive) {
@@ -192,6 +197,7 @@ struct CommentsSheetView: View {
                         .font(.system(size: 11))
                         .foregroundStyle(.tertiary)
                 }
+                .accessibilityLabel("More options for comment")
             }
             .padding(.top, 4)
         }
@@ -216,6 +222,8 @@ struct CommentsSheetView: View {
                         .font(.system(size: 15))
                         .lineLimit(4)
                         .focused($isInputFocused)
+                        .accessibilityLabel("Comment text field")
+                        .accessibilityHint("Type your comment here")
 
                     if !newComment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         Button {
@@ -233,6 +241,8 @@ struct CommentsSheetView: View {
                         }
                         .disabled(isSending)
                         .transition(.scale.combined(with: .opacity))
+                        .accessibilityLabel("Send comment")
+                        .accessibilityHint("Posts your comment")
                     }
                 }
                 .padding(.horizontal, 14)
@@ -275,7 +285,7 @@ struct CommentsSheetView: View {
         } catch {
             errorMessage = "Failed to load comments. Please try again."
             showError = true
-            print("[CommentsSheet] Failed to load comments: \(error)")
+            Self.logger.error("Failed to load comments: \(error.localizedDescription)")
         }
     }
 
@@ -315,7 +325,7 @@ struct CommentsSheetView: View {
                 newComment = commentText
                 errorMessage = "Failed to post comment. Please try again."
                 showError = true
-                print("[CommentsSheet] Failed to add comment: \(error)")
+                Self.logger.error("Failed to add comment: \(error.localizedDescription)")
             }
             isSending = false
         }
@@ -348,6 +358,9 @@ struct CommentsSheetView: View {
                             .padding(.horizontal, 16)
                             .padding(.vertical, 14)
                         }
+                        .accessibilityLabel(reason.displayName)
+                        .accessibilityValue(selectedReportReason == reason ? "Selected" : "")
+                        .accessibilityAddTraits(selectedReportReason == reason ? [.isButton, .isSelected] : .isButton)
 
                         if reason != ReportReason.allCases.last {
                             Divider().padding(.leading, 16)

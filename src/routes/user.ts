@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import sharp from 'sharp';
 import { supabaseAdmin } from '../services/supabase.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { uploadImage } from '../services/storage.js';
@@ -189,14 +190,24 @@ user.post('/avatar', async (c) => {
     const updates: Record<string, string> = {};
 
     if (body.body_photo) {
-      const buffer = Buffer.from(body.body_photo, 'base64');
+      const rawBuffer = Buffer.from(body.body_photo, 'base64');
+      // Strip EXIF/GPS metadata and normalize to JPEG
+      const buffer = await sharp(rawBuffer)
+        .withMetadata(false)
+        .jpeg()
+        .toBuffer();
       const path = `${userId}/body_${uuidv4()}.jpg`;
       const url = await uploadImage('avatars', path, buffer, 'image/jpeg');
       updates.body_photo_url = url;
     }
 
     if (body.selfie) {
-      const buffer = Buffer.from(body.selfie, 'base64');
+      const rawBuffer = Buffer.from(body.selfie, 'base64');
+      // Strip EXIF/GPS metadata and normalize to JPEG
+      const buffer = await sharp(rawBuffer)
+        .withMetadata(false)
+        .jpeg()
+        .toBuffer();
       const path = `${userId}/selfie_${uuidv4()}.jpg`;
       const url = await uploadImage('avatars', path, buffer, 'image/jpeg');
       updates.avatar_url = url;

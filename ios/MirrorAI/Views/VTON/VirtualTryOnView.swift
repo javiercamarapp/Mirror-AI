@@ -62,7 +62,7 @@ struct VirtualTryOnView: View {
             }
             .navigationTitle("Virtual Try-On")
             .navigationBarTitleDisplayMode(.inline)
-            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+            .dynamicTypeSize(...DynamicTypeSize.accessibility1)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -71,6 +71,8 @@ struct VirtualTryOnView: View {
                         Image(systemName: "clock.arrow.circlepath")
                             .font(.system(size: 16))
                     }
+                    .accessibilityLabel("Try-on history")
+                    .accessibilityHint("View your previous virtual try-ons")
                 }
             }
             .sheet(isPresented: $showResult) {
@@ -149,6 +151,8 @@ struct VirtualTryOnView: View {
                     alignment: .bottom
                 )
         )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(appState.vtonCredits) virtual try-on credits remaining")
     }
 
     // MARK: - Category Selector
@@ -177,6 +181,8 @@ struct VirtualTryOnView: View {
                                           : AnyShapeStyle(MirrorTheme.surfaceColor))
                             )
                     }
+                    .accessibilityLabel(category)
+                    .accessibilityAddTraits(selectedCategory == category ? [.isButton, .isSelected] : .isButton)
                 }
             }
             .padding(.horizontal, 20)
@@ -258,6 +264,10 @@ struct VirtualTryOnView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(item.name)\(isSelected ? ", selected" : "")")
+        .accessibilityHint(isSelected ? "Double tap to deselect" : "Double tap to select for try-on")
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 
     // MARK: - Try On Button
@@ -294,6 +304,8 @@ struct VirtualTryOnView: View {
             .disabled(appState.vtonCredits <= 0 || isGenerating)
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
+            .accessibilityLabel("Try on selected garment, costs 1 credit")
+            .accessibilityHint(appState.vtonCredits > 0 ? "Generates a virtual try-on image" : "No credits remaining")
         }
         .background(.ultraThinMaterial)
         .transition(.move(edge: .bottom).combined(with: .opacity))

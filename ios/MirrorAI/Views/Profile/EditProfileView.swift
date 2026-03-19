@@ -149,6 +149,10 @@ struct EditProfileView: View {
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(MirrorTheme.purple)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Profile photo")
+        .accessibilityHint("Double tap to change your profile photo")
+        .accessibilityAddTraits(.isButton)
     }
 
     // MARK: - Name
@@ -170,6 +174,8 @@ struct EditProfileView: View {
                                 .strokeBorder(MirrorTheme.borderColor, lineWidth: 1)
                         )
                 )
+                .accessibilityLabel("Display name")
+                .accessibilityHint("Enter your display name")
         }
     }
 
@@ -217,6 +223,9 @@ struct EditProfileView: View {
                     }
                 }
             }
+            .accessibilityLabel("Body photo for virtual try-on")
+            .accessibilityHint("Double tap to upload a body photo")
+            .accessibilityAddTraits(.isButton)
         }
     }
 
@@ -261,6 +270,8 @@ struct EditProfileView: View {
                                           : AnyShapeStyle(MirrorTheme.surfaceColor))
                             )
                     }
+                    .accessibilityLabel(option)
+                    .accessibilityAddTraits(gender == option ? [.isButton, .isSelected] : .isButton)
                 }
             }
         }
@@ -308,6 +319,9 @@ struct EditProfileView: View {
                                     )
                             )
                     }
+                    .accessibilityLabel(style)
+                    .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+                    .accessibilityHint(isSelected ? "Double tap to deselect" : "Double tap to select")
                 }
             }
         }

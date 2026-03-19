@@ -74,6 +74,8 @@ struct OutfitGeneratorView: View {
                             .font(.system(size: 22))
                             .foregroundStyle(.secondary)
                     }
+                    .accessibilityLabel("Close")
+                    .accessibilityHint("Dismisses the outfit generator")
                 }
             }
             .navigationDestination(isPresented: $showResult) {
@@ -196,6 +198,9 @@ struct OutfitGeneratorView: View {
             )
             .scaleEffect(selectedOccasion == name ? 1.02 : 1.0)
         }
+        .accessibilityLabel(name)
+        .accessibilityAddTraits(selectedOccasion == name ? [.isButton, .isSelected] : .isButton)
+        .accessibilityHint(selectedOccasion == name ? "Double tap to deselect" : "Double tap to select this occasion")
     }
 
     // MARK: - Season Section
@@ -251,6 +256,8 @@ struct OutfitGeneratorView: View {
             )
             .scaleEffect(selectedSeason == name ? 1.04 : 1.0)
         }
+        .accessibilityLabel(name)
+        .accessibilityAddTraits(selectedSeason == name ? [.isButton, .isSelected] : .isButton)
     }
 
     // MARK: - Mood Section
@@ -292,6 +299,8 @@ struct OutfitGeneratorView: View {
                                         )
                                 )
                         }
+                        .accessibilityLabel(mood)
+                        .accessibilityAddTraits(selectedMood == mood ? [.isButton, .isSelected] : .isButton)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -330,6 +339,8 @@ struct OutfitGeneratorView: View {
             )
         }
         .disabled(selectedOccasion == nil || isGenerating)
+        .accessibilityLabel("Generate outfit")
+        .accessibilityHint(selectedOccasion != nil ? "Creates an AI-generated outfit suggestion" : "Select an occasion first")
     }
 
     // MARK: - Wardrobe Info

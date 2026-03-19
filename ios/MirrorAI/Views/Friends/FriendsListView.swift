@@ -79,6 +79,9 @@ struct FriendsListView: View {
                             }
                         }
                     }
+                    .accessibilityLabel("Friend requests")
+                    .accessibilityValue(friendsVM.pendingRequests.isEmpty ? "No pending requests" : "\(friendsVM.pendingRequests.count) pending")
+                    .accessibilityHint("View pending friend requests")
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
@@ -88,6 +91,8 @@ struct FriendsListView: View {
                         Image(systemName: "person.badge.plus")
                             .font(.system(size: 17))
                     }
+                    .accessibilityLabel("Find friends")
+                    .accessibilityHint("Search for new friends to add")
                 }
             }
             .sheet(isPresented: $showRequests) {

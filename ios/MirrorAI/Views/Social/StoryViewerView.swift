@@ -92,6 +92,9 @@ struct StoryViewerView: View {
         }
         .ignoresSafeArea()
         .statusBarHidden()
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Story viewer for \(storyGroup.user?.username ?? "user"), story \(currentIndex + 1) of \(storyGroup.stories.count)")
+        .accessibilityHint("Tap left half for previous, right half for next. Swipe down to close.")
         .onAppear {
             setupProgress()
             startTimer()
@@ -125,6 +128,8 @@ struct StoryViewerView: View {
                 .clipped()
                 .transition(.opacity)
                 .id(story.id)
+                .accessibilityLabel("Story image by \(storyGroup.user?.username ?? "user")")
+                .accessibilityAddTraits(.isImage)
             }
         }
     }

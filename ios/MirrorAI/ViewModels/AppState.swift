@@ -246,7 +246,9 @@ class AppState {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-            let (data, response) = try await URLSession.shared.data(for: request)
+            // Use pinned session even for auth endpoints to prevent MITM
+            let pinnedSession = URLSession.pinned()
+            let (data, response) = try await pinnedSession.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse,
                   (200...299).contains(httpResponse.statusCode) else {
@@ -288,7 +290,9 @@ class AppState {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.httpBody = try JSONSerialization.data(withJSONObject: ["email": email])
 
-            let (_, response) = try await URLSession.shared.data(for: request)
+            // Use pinned session for auth endpoints
+            let pinnedSession = URLSession.pinned()
+            let (_, response) = try await pinnedSession.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse,
                   (200...299).contains(httpResponse.statusCode) else {
@@ -337,7 +341,7 @@ class AppState {
             request.setValue("application/json", forHTTPHeaderField: "Accept")
             request.httpBody = bodyData
 
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await URLSession.pinned().data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse,
                   (200...299).contains(httpResponse.statusCode) else {
@@ -380,7 +384,7 @@ class AppState {
             request.setValue("application/json", forHTTPHeaderField: "Accept")
             request.httpBody = bodyData
 
-            let (responseData, response) = try await URLSession.shared.data(for: request)
+            let (responseData, response) = try await URLSession.pinned().data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse,
                   (200...299).contains(httpResponse.statusCode) else {
@@ -546,7 +550,7 @@ class AppState {
             request.setValue("application/json", forHTTPHeaderField: "Accept")
             request.httpBody = bodyData
 
-            let (responseData, response) = try await URLSession.shared.data(for: request)
+            let (responseData, response) = try await URLSession.pinned().data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse,
                   (200...299).contains(httpResponse.statusCode) else {
@@ -727,7 +731,7 @@ class AppState {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             request.httpBody = try JSONSerialization.data(withJSONObject: ["read": true])
 
-            let (_, response) = try await URLSession.shared.data(for: request)
+            let (_, response) = try await URLSession.pinned().data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse,
                   (200...299).contains(httpResponse.statusCode) else {

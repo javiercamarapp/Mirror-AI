@@ -1,4 +1,5 @@
 import SwiftUI
+import os
 
 struct PostDetailView: View {
     @Environment(AppState.self) private var appState
@@ -17,6 +18,7 @@ struct PostDetailView: View {
     @State private var showError = false
     @State private var errorMessage = ""
     @FocusState private var isCommentFieldFocused: Bool
+    private static let logger = Logger(subsystem: "com.mirrorai", category: "PostDetailView")
 
     private var currentPost: SocialPostModel {
         appState.feedPosts.first(where: { $0.id == post.id }) ?? post
@@ -74,6 +76,8 @@ struct PostDetailView: View {
                                     .fill(MirrorTheme.surfaceColor)
                             )
                             .padding(.horizontal, 16)
+                            .accessibilityElement(children: .combine)
+                            .accessibilityLabel("Style score \(String(format: "%.1f", score))")
                         }
 
                         // Occasion tag
@@ -92,6 +96,7 @@ struct PostDetailView: View {
                                     .fill(MirrorTheme.purple.opacity(0.12))
                             )
                             .padding(.horizontal, 16)
+                            .accessibilityLabel("Occasion: \(occasion)")
                         }
 
                         // Timestamp
@@ -168,6 +173,9 @@ struct PostDetailView: View {
         .onTapGesture(count: 2) {
             triggerLikeAnimation()
         }
+        .accessibilityLabel("Post image")
+        .accessibilityHint("Double tap to like")
+        .accessibilityAddTraits(.isImage)
     }
 
     // MARK: - User Header
@@ -175,6 +183,7 @@ struct PostDetailView: View {
     private var userHeader: some View {
         HStack(spacing: 12) {
             avatarView(url: currentPost.user?.avatarUrl, size: 40)
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(currentPost.user?.username ?? currentPost.user?.fullName ?? "User")
@@ -312,6 +321,8 @@ struct PostDetailView: View {
                 TextField("Add a comment...", text: $newComment)
                     .font(.system(size: 15))
                     .focused($isCommentFieldFocused)
+                    .accessibilityLabel("Comment text field")
+                    .accessibilityHint("Type your comment here")
 
                 if !newComment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     Button {
@@ -329,6 +340,8 @@ struct PostDetailView: View {
                     }
                     .disabled(isSendingComment)
                     .transition(.scale.combined(with: .opacity))
+                    .accessibilityLabel("Post comment")
+                    .accessibilityHint("Submits your comment")
                 }
             }
             .padding(.horizontal, 16)
@@ -358,7 +371,7 @@ struct PostDetailView: View {
                 )
             }
         } catch {
-            print("[PostDetailView] Failed to load comments: \(error)")
+            Self.logger.error("Failed to load comments: \(error.localizedDescription)")
         }
     }
 
@@ -398,7 +411,7 @@ struct PostDetailView: View {
                 newComment = commentText
                 errorMessage = "Failed to post comment. Please try again."
                 showError = true
-                print("[PostDetailView] Failed to add comment: \(error)")
+                Self.logger.error("Failed to add comment: \(error.localizedDescription)")
             }
             isSendingComment = false
         }

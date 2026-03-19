@@ -87,6 +87,8 @@ struct ItemDetailView: View {
             .clipShape(RoundedRectangle(cornerRadius: 24))
         }
         .frame(height: 340)
+        .accessibilityLabel("Image of \(item.name)")
+        .accessibilityAddTraits(.isImage)
     }
 
     // MARK: - Item Info
@@ -117,6 +119,8 @@ struct ItemDetailView: View {
                 }
                 .foregroundStyle(MirrorTheme.purple)
             }
+            .accessibilityLabel(isEditing ? "Save changes" : "Edit item details")
+            .accessibilityHint(isEditing ? "Saves your changes" : "Enables editing of item details")
         }
     }
 
@@ -307,6 +311,8 @@ struct ItemDetailView: View {
                             .fill(MirrorTheme.purple.opacity(0.12))
                     )
                 }
+                .accessibilityLabel("Log wear")
+                .accessibilityHint("Records that you wore this item today")
             }
         }
     }
@@ -333,6 +339,8 @@ struct ItemDetailView: View {
                         .fill(MirrorTheme.gradientPrimary)
                 )
             }
+            .accessibilityLabel("Try on \(item.name)")
+            .accessibilityHint("Opens virtual try-on for this item")
 
             ShareLink(item: item.name) {
                 HStack(spacing: 8) {
@@ -374,6 +382,8 @@ struct ItemDetailView: View {
                     .fill(Color.red.opacity(0.08))
             )
         }
+        .accessibilityLabel("Remove \(item.name) from wardrobe")
+        .accessibilityHint("Permanently deletes this item")
     }
 
     // MARK: - Favorite Button

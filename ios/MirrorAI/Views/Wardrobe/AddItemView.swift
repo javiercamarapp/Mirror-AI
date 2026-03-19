@@ -171,6 +171,8 @@ struct AddItemView: View {
                             )
                     )
                 }
+                .accessibilityLabel("Add a photo of your clothing item")
+                .accessibilityHint("Opens camera or photo library")
             }
         }
     }
@@ -210,6 +212,8 @@ struct AddItemView: View {
                                             .fill(category == cat ? AnyShapeStyle(MirrorTheme.gradientPrimary) : AnyShapeStyle(MirrorTheme.surfaceColor))
                                     )
                             }
+                            .accessibilityLabel(cat)
+                            .accessibilityAddTraits(category == cat ? [.isButton, .isSelected] : .isButton)
                         }
                     }
                 }
@@ -272,6 +276,8 @@ struct AddItemView: View {
                                     )
                             )
                     }
+                    .accessibilityLabel(season)
+                    .accessibilityAddTraits(selectedSeasons.contains(season) ? [.isButton, .isSelected] : .isButton)
                 }
             }
         }
@@ -309,6 +315,8 @@ struct AddItemView: View {
                                     )
                             )
                     }
+                    .accessibilityLabel(occasion)
+                    .accessibilityAddTraits(selectedOccasions.contains(occasion) ? [.isButton, .isSelected] : .isButton)
                 }
             }
         }
@@ -341,6 +349,8 @@ struct AddItemView: View {
             )
         }
         .disabled(!canSave || isSaving)
+        .accessibilityLabel(isSaving ? "Saving item" : "Save to wardrobe")
+        .accessibilityHint(canSave ? "Saves this clothing item to your wardrobe" : "Fill in required fields first")
     }
 
     private var canSave: Bool {

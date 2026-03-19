@@ -22,9 +22,11 @@ const CREDITS_BY_PLAN: Record<string, number> = {
 // ─── POST /vton/generate ────────────────────────────────────────────────────
 // Start virtual try-on: uses user's avatar body photo + the garment.
 // Checks & decrements VTON credits. Returns the try-on result image URL.
+// Supports X-Idempotency-Key header for safe retries.
 vton.post('/generate', async (c) => {
   try {
     const userId = c.get('userId');
+    const idempotencyKey = c.req.header('X-Idempotency-Key') ?? null;
     const body = await c.req.json<{
       garment_image_url: string;
       category: 'tops' | 'bottoms' | 'one-pieces';
@@ -37,6 +39,33 @@ vton.post('/generate', async (c) => {
     const validCategories = ['tops', 'bottoms', 'one-pieces'];
     if (!validCategories.includes(body.category)) {
       return c.json({ success: false, error: 'category must be one of: tops, bottoms, one-pieces' }, 400);
+    }
+
+    // Idempotency: if this request was already processed, return the cached result
+    if (idempotencyKey) {
+      const { data: existingUsage } = await supabaseAdmin
+        .from('vton_usage')
+        .select('result_image_url')
+        .eq('request_id', idempotencyKey)
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (existingUsage) {
+        const { data: profile } = await supabaseAdmin
+          .from('user_profiles')
+          .select('vton_credits')
+          .eq('id', userId)
+          .single();
+
+        return c.json({
+          success: true,
+          data: {
+            result_image_url: existingUsage.result_image_url,
+            credits_remaining: profile?.vton_credits ?? 0,
+            idempotent_replay: true,
+          },
+        });
+      }
     }
 
     // Check user credits and get body photo
@@ -61,12 +90,45 @@ vton.post('/generate', async (c) => {
       }, 400);
     }
 
+    // Decrement credit atomically BEFORE calling external API to prevent over-spending
+    const { data: decrementResult, error: creditError } = await supabaseAdmin
+      .rpc('decrement_credits', {
+        p_user_id: userId,
+        p_amount: 1,
+        p_request_id: idempotencyKey,
+      });
+
+    if (creditError) {
+      logger.error({ err: creditError }, 'Credit decrement failed');
+      return c.json({ success: false, error: 'Failed to decrement credits. Please retry.' }, 409);
+    }
+
+    if (decrementResult === null || decrementResult === undefined || decrementResult < 0) {
+      return c.json({ success: false, error: 'Insufficient credits.' }, 403);
+    }
+
+    const newCredits = decrementResult as number;
+
     // Call Fashn.ai for virtual try-on
-    const resultUrl = await tryOn(
-      profile.body_photo_url,
-      body.garment_image_url,
-      body.category
-    );
+    let resultUrl: string;
+    try {
+      resultUrl = await tryOn(
+        profile.body_photo_url,
+        body.garment_image_url,
+        body.category
+      );
+    } catch (tryOnErr) {
+      // Refund the credit on try-on failure
+      logger.error({ err: tryOnErr }, 'VTON try-on failed, refunding credit');
+      await supabaseAdmin.rpc('increment_credits_atomic', {
+        p_user_id: userId,
+        p_amount: 1,
+        p_request_id: null,
+      }).catch((refundErr: unknown) => {
+        logger.error({ err: refundErr }, 'Failed to refund credit after try-on failure');
+      });
+      throw tryOnErr;
+    }
 
     // Download result and re-upload to our storage for persistence
     let storedUrl = resultUrl;
@@ -82,21 +144,14 @@ vton.post('/generate', async (c) => {
       logger.warn({ err: storageErr }, 'Failed to persist VTON result to storage, using original URL');
     }
 
-    // Decrement credit atomically using database function to prevent race conditions
-    const { data: decrementResult, error: creditError } = await supabaseAdmin
-      .rpc('decrement_credits', { p_user_id: userId, p_amount: 1 });
-    if (creditError || decrementResult === null || decrementResult < 0) {
-      return c.json({ success: false, error: 'Failed to decrement credits. Please retry.' }, 409);
-    }
-    const newCredits = decrementResult;
-
-    // Log usage in history
+    // Log usage in history (with request_id for idempotency tracking)
     await supabaseAdmin.from('vton_usage').insert({
       id: uuidv4(),
       user_id: userId,
       garment_item_id: null,
       result_image_url: storedUrl,
       credits_used: 1,
+      request_id: idempotencyKey,
     });
 
     return c.json({

@@ -69,7 +69,7 @@ struct HomeView: View {
         .refreshable {
             await refreshData()
         }
-        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
     }
 
     // MARK: - Greeting

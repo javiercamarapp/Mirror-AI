@@ -42,7 +42,7 @@ struct AIStylistChatView: View {
             .background(Color(UIColor.systemBackground))
             .navigationTitle(L10n.tabHome == "Home" ? "AI Stylist" : "AI Stylist")
             .navigationBarTitleDisplayMode(.inline)
-            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+            .dynamicTypeSize(...DynamicTypeSize.accessibility1)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Close") { dismiss() }
@@ -251,6 +251,8 @@ struct AIStylistChatView: View {
                                     )
                             )
                     }
+                    .accessibilityLabel(suggestion)
+                    .accessibilityHint("Sends this as a message to the AI stylist")
                 }
             }
             .padding(.horizontal, 16)
@@ -272,6 +274,8 @@ struct AIStylistChatView: View {
                         .fill(Color(UIColor.secondarySystemBackground))
                 )
                 .focused($isInputFocused)
+                .accessibilityLabel("Message input")
+                .accessibilityHint("Type a question for the AI stylist")
 
             Button {
                 sendMessage()

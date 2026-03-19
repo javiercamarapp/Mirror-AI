@@ -56,6 +56,9 @@ struct SettingsView: View {
                         }
                     }
                     .tint(MirrorTheme.purple)
+                    .accessibilityLabel("Push Notifications")
+                    .accessibilityValue(notificationsEnabled ? "On" : "Off")
+                    .accessibilityHint("Toggle push notifications")
 
                     Toggle(isOn: $hapticFeedback) {
                         HStack(spacing: 12) {
@@ -65,6 +68,9 @@ struct SettingsView: View {
                         }
                     }
                     .tint(MirrorTheme.purple)
+                    .accessibilityLabel("Haptic Feedback")
+                    .accessibilityValue(hapticFeedback ? "On" : "Off")
+                    .accessibilityHint("Toggle haptic feedback")
 
                     Toggle(isOn: .constant(true)) {
                         HStack(spacing: 12) {
@@ -75,6 +81,9 @@ struct SettingsView: View {
                     }
                     .tint(MirrorTheme.purple)
                     .disabled(true)
+                    .accessibilityLabel("Dark Mode")
+                    .accessibilityValue("On")
+                    .accessibilityHint("Dark mode is always on")
                 } header: {
                     Text("App Preferences")
                         .font(.system(size: 13, weight: .semibold))
@@ -98,6 +107,8 @@ struct SettingsView: View {
                             Spacer()
                         }
                     }
+                    .accessibilityLabel("Clear Image Cache")
+                    .accessibilityHint("Removes all cached images to free up storage")
 
                     Button {
                         exportUserData()
@@ -110,6 +121,8 @@ struct SettingsView: View {
                             Spacer()
                         }
                     }
+                    .accessibilityLabel("Export My Data")
+                    .accessibilityHint("Downloads your personal data as a file")
 
                     Button {
                         reportBug()
@@ -122,6 +135,8 @@ struct SettingsView: View {
                             Spacer()
                         }
                     }
+                    .accessibilityLabel("Report a Bug")
+                    .accessibilityHint("Opens email to send a bug report")
                 } header: {
                     Text("Support")
                         .font(.system(size: 13, weight: .semibold))
@@ -174,6 +189,8 @@ struct SettingsView: View {
                             Spacer()
                         }
                     }
+                    .accessibilityLabel("Log Out")
+                    .accessibilityHint("Signs you out of your account")
 
                     Button {
                         showDeleteAlert = true
@@ -186,6 +203,8 @@ struct SettingsView: View {
                             Spacer()
                         }
                     }
+                    .accessibilityLabel("Delete Account")
+                    .accessibilityHint("Permanently deletes your account and all data")
                 }
                 .listRowBackground(
                     RoundedRectangle(cornerRadius: 12)
