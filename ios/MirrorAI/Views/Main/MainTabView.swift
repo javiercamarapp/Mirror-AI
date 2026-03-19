@@ -98,7 +98,7 @@ struct MainTabView: View {
                     .font(.caption2)
                     .fontWeight(.medium)
             }
-            .foregroundStyle(selectedTab == tab ? AnyShapeStyle(MirrorTheme.gradientPrimary) : AnyShapeStyle(Color.gray.opacity(0.6)))
+            .foregroundStyle(selectedTab == tab ? AnyShapeStyle(MirrorTheme.gradientPrimary) : AnyShapeStyle(Color.gray.opacity(0.8)))
             .frame(maxWidth: .infinity)
         }
         .accessibilityLabel(label)

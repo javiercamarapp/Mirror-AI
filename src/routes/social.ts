@@ -81,13 +81,27 @@ social.get('/feed', async (c) => {
     // Filter out blocked users from feed
     const filteredIds = allIds.filter((id) => !blockedIds.has(id));
 
-    const { data: posts, error, count } = await supabaseAdmin
+    // Get hidden post IDs for the current user
+    const { data: hiddenPosts } = await supabaseAdmin
+      .from('hidden_posts')
+      .select('post_id')
+      .eq('user_id', userId);
+    const hiddenPostIds = new Set((hiddenPosts ?? []).map((h) => h.post_id));
+
+    let query = supabaseAdmin
       .from('social_posts')
       .select('*, user:user_profiles!user_id(full_name, avatar_url)', { count: 'exact' })
       .in('user_id', filteredIds)
       .is('deleted_at', null)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
+
+    // Exclude hidden posts if any
+    if (hiddenPostIds.size > 0) {
+      query = query.not('id', 'in', `(${[...hiddenPostIds].join(',')})`);
+    }
+
+    const { data: posts, error, count } = await query;
 
     if (error) {
       return c.json({ success: false, error: error.message }, 500);
@@ -920,7 +934,8 @@ social.post('/posts/:id/share', async (c) => {
   try {
     const userId = c.get('userId');
     const postId = c.req.param('id');
-    const body = await c.req.json<{ platform?: string }>().catch((): { platform?: string } => ({}));
+    const rawBody = await c.req.json().catch(() => ({}));
+    const body = { platform: typeof rawBody.platform === 'string' ? rawBody.platform.slice(0, 50) : undefined };
 
     // Verify post exists
     const { data: post } = await supabaseAdmin
@@ -1018,11 +1033,15 @@ social.post('/admin/reports/:id/resolve', async (c) => {
     }
 
     const reportId = c.req.param('id');
-    const body = await c.req.json<{ resolution: 'dismissed' | 'action_taken' }>();
-
-    if (!body.resolution || !['dismissed', 'action_taken'].includes(body.resolution)) {
-      return c.json({ success: false, error: 'resolution must be "dismissed" or "action_taken"' }, 400);
+    const rawBody = await c.req.json().catch(() => null);
+    if (!rawBody || typeof rawBody.resolution !== 'string') {
+      return c.json({ success: false, error: 'resolution is required' }, 400);
     }
+    const validResolutions = ['dismissed', 'action_taken', 'reviewed'];
+    if (!validResolutions.includes(rawBody.resolution)) {
+      return c.json({ success: false, error: `resolution must be one of: ${validResolutions.join(', ')}` }, 400);
+    }
+    const body = { resolution: rawBody.resolution as 'dismissed' | 'action_taken' | 'reviewed' };
 
     const { data: report, error } = await supabaseAdmin
       .from('content_reports')
@@ -1058,7 +1077,11 @@ social.post('/admin/reports/:id/action', async (c) => {
     }
 
     const reportId = c.req.param('id');
-    const body = await c.req.json<{
+    const rawActionBody = await c.req.json().catch(() => null);
+    if (!rawActionBody || !['warn', 'suspend', 'ban'].includes(rawActionBody.action)) {
+      return c.json({ success: false, error: 'action must be "warn", "suspend", or "ban"' }, 400);
+    }
+    const body = rawActionBody as {
       action: 'warn' | 'suspend' | 'ban';
       reason?: string;
       suspend_days?: number;
