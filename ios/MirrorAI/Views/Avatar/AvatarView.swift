@@ -57,7 +57,7 @@ struct AvatarView: View {
             }
             .navigationTitle("My Avatar")
             .navigationBarTitleDisplayMode(.large)
-            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+            .dynamicTypeSize(...DynamicTypeSize.accessibility1)
             .sheet(isPresented: $showCustomizer) {
                 AvatarCustomizerView()
             }

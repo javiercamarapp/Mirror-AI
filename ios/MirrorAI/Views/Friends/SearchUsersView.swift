@@ -35,6 +35,7 @@ struct SearchUsersView: View {
                                     .font(.system(size: 16))
                                     .foregroundStyle(.tertiary)
                             }
+                            .accessibilityLabel("Clear search")
                         }
                     }
                     .padding(14)
@@ -158,6 +159,8 @@ struct SearchUsersView: View {
             }
         }
         .transition(.opacity.combined(with: .move(edge: .trailing)))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(user.fullName ?? "User")\(user.username != nil ? ", @\(user.username!)" : "")")
     }
 
     @ViewBuilder
@@ -217,6 +220,8 @@ struct SearchUsersView: View {
                         .fill(MirrorTheme.gradientPrimary)
                 )
             }
+            .accessibilityLabel("Send friend request")
+            .accessibilityHint("Sends a friend request to \(user.fullName ?? "this user")")
         }
     }
 

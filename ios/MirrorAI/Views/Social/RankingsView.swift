@@ -1,4 +1,5 @@
 import SwiftUI
+import os
 
 struct RankingsView: View {
     @Environment(AppState.self) private var appState
@@ -302,7 +303,7 @@ struct RankingsView: View {
         } catch {
             errorMessage = "Failed to load rankings. Please try again."
             showError = true
-            print("[RankingsView] Failed to load rankings: \(error)")
+            Logger(subsystem: "com.mirrorai", category: "RankingsView").error("Failed to load rankings: \(error.localizedDescription)")
         }
     }
 

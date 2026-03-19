@@ -1,5 +1,6 @@
 import SwiftUI
 import AuthenticationServices
+import os
 
 struct AuthView: View {
     @Environment(AppState.self) private var appState
@@ -52,7 +53,7 @@ struct AuthView: View {
                 }
             }
         }
-        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         .sheet(isPresented: $showPrivacyPolicy) {
             privacyPolicySheet
         }
@@ -539,7 +540,7 @@ struct AuthView: View {
             }
 
         case .failure(let error):
-            print("[AuthView] Apple Sign In failed: \(error.localizedDescription)")
+            Logger(subsystem: "com.mirrorai", category: "AuthView").error("Apple Sign In failed: \(error.localizedDescription)")
         }
     }
 

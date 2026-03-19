@@ -1,5 +1,6 @@
 import SwiftUI
 import Foundation
+import os
 
 @Observable
 @MainActor
@@ -170,6 +171,8 @@ class FriendsViewModel {
 
     // MARK: - Private Helpers
 
+    private static let logger = Logger(subsystem: "com.mirrorai", category: "FriendsViewModel")
+
     private func handleError(_ error: Error, context: String) {
         let message: String
         if let apiError = error as? APIError {
@@ -178,7 +181,7 @@ class FriendsViewModel {
             message = error.localizedDescription
         }
         errorMessage = "Error \(context): \(message)"
-        print("[FriendsViewModel] Error \(context): \(message)")
+        Self.logger.error("Error \(context): \(message)")
     }
 }
 

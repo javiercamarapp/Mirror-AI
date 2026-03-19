@@ -266,7 +266,10 @@ struct SubscriptionView: View {
             )
         }
         .scaleEffect(isSelected ? 1.01 : 1.0)
-
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(plan.name) plan, \(localizedPrice(for: plan))\(plan.id != "free" ? " per month" : "")\(isCurrentPlan ? ", current plan" : "")")
+        .accessibilityHint(isSelected ? "Currently selected" : "Double tap to select this plan")
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 
     // MARK: - Subscribe Button
@@ -296,6 +299,8 @@ struct SubscriptionView: View {
             )
         }
         .disabled(isPurchasing)
+        .accessibilityLabel(isPurchasing ? "Processing purchase" : "Subscribe to \(selectedPlan == "pro" ? "Pro" : "Premium")")
+        .accessibilityHint("Starts the subscription purchase")
     }
 
     // MARK: - Restore
@@ -312,6 +317,8 @@ struct SubscriptionView: View {
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(MirrorTheme.purple)
         }
+        .accessibilityLabel("Restore purchases")
+        .accessibilityHint("Restores previously purchased subscriptions")
     }
 
     @State private var showSubscriptionPrivacyPolicy = false

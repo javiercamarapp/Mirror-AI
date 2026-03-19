@@ -37,7 +37,7 @@ struct MainTabView: View {
         .sheet(isPresented: $showCreateSheet) {
             createActionSheet
         }
-        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
     }
 
     // MARK: - Custom Tab Bar

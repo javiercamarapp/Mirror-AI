@@ -177,6 +177,10 @@ struct FriendsListView: View {
                 }
             }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(friend.fullName ?? "Friend")\(friend.username != nil ? ", @\(friend.username!)" : "")")
+        .accessibilityHint("Opens friend's profile")
+        .accessibilityAddTraits(.isButton)
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             Button(role: .destructive) {
                 Task {

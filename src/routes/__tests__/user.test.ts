@@ -40,14 +40,11 @@ vi.mock('../../services/logger.js', () => ({
 }));
 
 const mockUploadImage = vi.fn().mockResolvedValue('https://storage.example.com/image.png');
-const mockDeleteImage = vi.fn().mockResolvedValue(undefined);
-const mockGetPublicUrl = vi.fn().mockReturnValue('https://storage.example.com/public.png');
-const mockExtractPathFromUrl = vi.fn().mockReturnValue('user-1/image.png');
 vi.mock('../../services/storage.js', () => ({
   uploadImage: (...args: any[]) => mockUploadImage(...args),
-  deleteImage: (...args: any[]) => mockDeleteImage(...args),
-  getPublicUrl: (...args: any[]) => mockGetPublicUrl(...args),
-  extractPathFromUrl: (...args: any[]) => mockExtractPathFromUrl(...args),
+  deleteImage: vi.fn().mockResolvedValue(undefined),
+  extractPathFromUrl: vi.fn().mockReturnValue('user-1/image.png'),
+  getPublicUrl: vi.fn().mockReturnValue('https://storage.example.com/public.png'),
 }));
 
 vi.mock('uuid', () => ({
@@ -68,10 +65,7 @@ function chainMock(returnValue: { data: any; error: any; count?: number }) {
 }
 
 // ─── Import route after mocks ──────────────────────────────────────────────
-const storageModule = await import('../../services/storage.js');
-console.log('DEBUG storage module keys:', Object.keys(storageModule));
-console.log('DEBUG uploadImage is mock?', (storageModule.uploadImage as any).mock !== undefined);
-
+const { uploadImage: importedUploadImage } = await import('../../services/storage.js');
 const { userRoutes } = await import('../../routes/user.js');
 
 const app = new Hono<{ Variables: AppVariables }>();
@@ -90,6 +84,12 @@ const AUTH_HEADER = { 'X-Test-User-Id': 'user-1' };
 describe('User Routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('debug: uploadImage mock should work', async () => {
+    const result = await importedUploadImage('avatars' as any, 'test/path.jpg', Buffer.from('test'), 'image/jpeg');
+    console.log('DEBUG direct call result:', result);
+    expect(result).toBe('https://storage.example.com/image.png');
   });
 
   // ── GET /user/profile ─────────────────────────────────────────────────
@@ -287,12 +287,9 @@ describe('User Routes', () => {
       const chain = chainMock({ data: { id: 'user-1', body_photo_url: 'https://storage.example.com/image.png' }, error: null });
       mockSupabase.from.mockReturnValue(chain);
 
-      console.log('DEBUG mockUploadImage is mock:', typeof mockUploadImage, mockUploadImage.mockResolvedValue !== undefined);
       const res = await req('POST', '/avatar', { body_photo: 'dGVzdA==' }, AUTH_HEADER);
-      const json = await res.json();
-      console.log('DEBUG avatar upload response:', JSON.stringify(json));
-      console.log('DEBUG mockUploadImage called:', mockUploadImage.mock.calls.length);
       expect(res.status).toBe(200);
+      const json = await res.json();
       expect(json.success).toBe(true);
       expect(mockUploadImage).toHaveBeenCalledTimes(1);
     });

@@ -35,7 +35,7 @@ struct DailyOutfitView: View {
             .background(Color(UIColor.systemBackground))
             .navigationTitle("Daily Outfit")
             .navigationBarTitleDisplayMode(.inline)
-            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+            .dynamicTypeSize(...DynamicTypeSize.accessibility1)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Close") { dismiss() }

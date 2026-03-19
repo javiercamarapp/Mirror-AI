@@ -164,7 +164,7 @@ struct OnboardingView: View {
         }
         .padding(.horizontal)
         .animation(reduceMotion ? .none : .easeInOut(duration: 0.3), value: selectedAgeRange)
-        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
     }
 
     private func ageOptionCard(label: String, value: String) -> some View {

@@ -1,4 +1,5 @@
 import SwiftUI
+import os
 
 @main
 struct MirrorAIApp: App {
@@ -84,7 +85,7 @@ struct MirrorAIApp: App {
                 await appState.setAuthToken(authData.accessToken)
             }
         } catch {
-            print("[MirrorAIApp] Auth callback failed: \(error)")
+            Logger(subsystem: "com.mirrorai", category: "MirrorAIApp").error("Auth callback failed: \(error.localizedDescription)")
         }
     }
 }
