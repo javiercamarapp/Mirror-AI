@@ -101,7 +101,7 @@ describe('Wardrobe Routes', () => {
       });
       mockSupabase.from.mockReturnValue(chain);
 
-      const res = await req('GET', '/', undefined, AUTH);
+      const res = await req('GET', '', undefined, AUTH);
       expect(res.status).toBe(200);
       const json = await res.json();
       expect(json.data).toHaveLength(2);
@@ -112,7 +112,7 @@ describe('Wardrobe Routes', () => {
       const chain = chainMock({ data: [{ id: 'i1', category: 'tops' }], error: null, count: 1 });
       mockSupabase.from.mockReturnValue(chain);
 
-      const res = await req('GET', '/?category=tops', undefined, AUTH);
+      const res = await req('GET', '?category=tops', undefined, AUTH);
       expect(res.status).toBe(200);
       // Verify eq was called with category filter
       expect(chain.eq).toHaveBeenCalled();
@@ -122,7 +122,7 @@ describe('Wardrobe Routes', () => {
       const chain = chainMock({ data: [], error: null, count: 0 });
       mockSupabase.from.mockReturnValue(chain);
 
-      const res = await req('GET', '/?color=blue', undefined, AUTH);
+      const res = await req('GET', '?color=blue', undefined, AUTH);
       expect(res.status).toBe(200);
       expect(chain.ilike).toHaveBeenCalled();
     });
@@ -131,7 +131,7 @@ describe('Wardrobe Routes', () => {
       const chain = chainMock({ data: [], error: null, count: 0 });
       mockSupabase.from.mockReturnValue(chain);
 
-      const res = await req('GET', '/?season=summer', undefined, AUTH);
+      const res = await req('GET', '?season=summer', undefined, AUTH);
       expect(res.status).toBe(200);
       expect(chain.contains).toHaveBeenCalled();
     });
@@ -140,7 +140,7 @@ describe('Wardrobe Routes', () => {
       const chain = chainMock({ data: [], error: null, count: 0 });
       mockSupabase.from.mockReturnValue(chain);
 
-      const res = await req('GET', '/?favorite=true', undefined, AUTH);
+      const res = await req('GET', '?favorite=true', undefined, AUTH);
       expect(res.status).toBe(200);
     });
 
@@ -150,7 +150,7 @@ describe('Wardrobe Routes', () => {
     });
 
     it('should return 401 when not authenticated', async () => {
-      const res = await req('GET', '/');
+      const res = await req('GET', '');
       expect(res.status).toBe(401);
     });
   });
@@ -177,14 +177,14 @@ describe('Wardrobe Routes', () => {
         return insertChain;
       });
 
-      const res = await req('POST', '/', {
+      const res = await req('POST', '', {
         image: Buffer.from('fake-image').toString('base64'),
       }, AUTH);
       expect(res.status).toBe(201);
     });
 
     it('should return 400 when image is missing', async () => {
-      const res = await req('POST', '/', {}, AUTH);
+      const res = await req('POST', '', {}, AUTH);
       expect(res.status).toBe(400);
     });
 
@@ -198,7 +198,7 @@ describe('Wardrobe Routes', () => {
         return callIdx === 1 ? profileChain : countChain;
       });
 
-      const res = await req('POST', '/', {
+      const res = await req('POST', '', {
         image: Buffer.from('img').toString('base64'),
       }, AUTH);
       expect(res.status).toBe(403);
@@ -216,7 +216,7 @@ describe('Wardrobe Routes', () => {
         return callIdx === 1 ? profileChain : countChain;
       });
 
-      const res = await req('POST', '/', {
+      const res = await req('POST', '', {
         image: Buffer.from('img').toString('base64'),
       }, AUTH);
       expect(res.status).toBe(403);
@@ -235,7 +235,7 @@ describe('Wardrobe Routes', () => {
         return callIdx === 1 ? profileChain : insertChain;
       });
 
-      const res = await req('POST', '/', {
+      const res = await req('POST', '', {
         image: Buffer.from('img').toString('base64'),
       }, AUTH);
       expect(res.status).toBe(201);
@@ -253,7 +253,7 @@ describe('Wardrobe Routes', () => {
 
       // Create a string larger than 10MB base64 threshold
       const oversizedImage = 'A'.repeat(15 * 1024 * 1024);
-      const res = await req('POST', '/', { image: oversizedImage }, AUTH);
+      const res = await req('POST', '', { image: oversizedImage }, AUTH);
       expect(res.status).toBe(400);
       const json = await res.json();
       expect(json.error).toContain('10MB');
