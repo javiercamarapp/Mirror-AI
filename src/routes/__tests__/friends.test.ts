@@ -90,7 +90,7 @@ describe('Friends Routes', () => {
         return callIdx === 1 ? friendshipsChain : profilesChain;
       });
 
-      const res = await req('GET', '/', undefined, AUTH);
+      const res = await req('GET', '', undefined, AUTH);
       expect(res.status).toBe(200);
       const json = await res.json();
       expect(json.data).toHaveLength(1);
@@ -102,7 +102,7 @@ describe('Friends Routes', () => {
       const chain = chainMock({ data: [], error: null });
       mockSupabase.from.mockReturnValue(chain);
 
-      const res = await req('GET', '/', undefined, AUTH);
+      const res = await req('GET', '', undefined, AUTH);
       expect(res.status).toBe(200);
       const json = await res.json();
       expect(json.data).toEqual([]);
