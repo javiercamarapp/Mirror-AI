@@ -50,7 +50,7 @@ struct LoadingOverlay: View {
                     .fill(.ultraThinMaterial)
                     .overlay(
                         RoundedRectangle(cornerRadius: 24)
-                            .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
+                            .strokeBorder(Color.white.opacity(0.4), lineWidth: 1)
                     )
             )
             .scaleEffect(reduceMotion ? 1.0 : (isAnimating ? 1.0 : 0.9))

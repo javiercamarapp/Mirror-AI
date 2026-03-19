@@ -278,7 +278,7 @@ struct SocialFeedView: View {
                 let body: [String: String] = ["postId": postId, "reason": selectedReportReason.rawValue]
                 request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-                let (_, response) = try await URLSession.shared.data(for: request)
+                let (_, response) = try await URLSession.pinned().data(for: request)
                 guard let httpResponse = response as? HTTPURLResponse,
                       (200...299).contains(httpResponse.statusCode) else {
                     throw URLError(.badServerResponse)
@@ -318,7 +318,7 @@ struct SocialFeedView: View {
                 let body: [String: String] = ["userId": userId]
                 request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-                let (_, response) = try await URLSession.shared.data(for: request)
+                let (_, response) = try await URLSession.pinned().data(for: request)
                 guard let httpResponse = response as? HTTPURLResponse,
                       (200...299).contains(httpResponse.statusCode) else {
                     throw URLError(.badServerResponse)
@@ -424,7 +424,7 @@ private struct FeedPostCard: View {
             // Timestamp
             Text(relativeTime(from: post.createdAt))
                 .font(.system(size: 11))
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(.secondary)
                 .padding(.horizontal, 16)
                 .padding(.top, 4)
                 .padding(.bottom, 12)

@@ -93,7 +93,7 @@ struct FriendRequestsView: View {
 
                     Text(timeAgo(from: request.createdAt))
                         .font(.system(size: 11))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(.secondary)
                 }
 
                 Spacer()

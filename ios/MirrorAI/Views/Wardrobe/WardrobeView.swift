@@ -267,7 +267,7 @@ struct WardrobeView: View {
                         .frame(width: 12, height: 12)
                         .overlay(
                             Circle()
-                                .strokeBorder(Color.white.opacity(0.3), lineWidth: 1)
+                                .strokeBorder(Color.white.opacity(0.4), lineWidth: 1)
                         )
                         .accessibilityLabel(item.color)
                 }

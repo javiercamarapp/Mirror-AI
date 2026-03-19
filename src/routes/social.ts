@@ -2,13 +2,39 @@ import { Hono } from 'hono';
 import { supabaseAdmin } from '../services/supabase.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { moderationMiddleware } from '../middleware/moderation.js';
+import { validateBody, schemas } from '../middleware/validate.js';
 import { sendPushNotification } from '../services/pushNotifications.js';
 import { processReports } from '../services/contentModeration.js';
 import { logger } from '../services/logger.js';
 import type { AppVariables } from '../types/index.js';
 import { v4 as uuidv4 } from 'uuid';
 
+// ─── Helper: Sanitize HTML from user-provided text ─────────────────────────
+function sanitizeHtml(input: string): string {
+  let raw = input.trim()
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#x27;/gi, "'")
+    .replace(/&#x2F;/gi, '/')
+    .replace(/&#(\d+);/g, (_, dec: string) => String.fromCharCode(parseInt(dec, 10)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)));
+  let previous: string;
+  do {
+    previous = raw;
+    raw = raw.replace(/<\/?[^>]+(>|$)/g, '');
+  } while (raw !== previous);
+  raw = raw.replace(/[<>]/g, '');
+  raw = raw.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+  return raw.trim();
+}
+
 const social = new Hono<{ Variables: AppVariables }>();
+
+// ─── Materialized view staleness tracking ────────────────────────────────────
+const RANKINGS_REFRESH_INTERVAL_MS = 5 * 60_000; // refresh at most every 5 minutes
+let lastRankingsRefresh = 0;
 
 // All social routes require authentication
 social.use('*', authMiddleware);
@@ -105,10 +131,10 @@ social.get('/feed', async (c) => {
 
 // ─── POST /social/posts ─────────────────────────────────────────────────────
 // Create post (outfit share). Content moderation is applied to text fields.
-social.post('/posts', moderationMiddleware, async (c) => {
+social.post('/posts', validateBody(schemas.createPost), moderationMiddleware, async (c) => {
   try {
     const userId = c.get('userId');
-    const body = await c.req.json<{
+    const body = c.get('validatedBody') as {
       type: string;
       image_url: string;
       caption?: string;
@@ -116,11 +142,9 @@ social.post('/posts', moderationMiddleware, async (c) => {
       outfit_id?: string;
       outfit_data?: Record<string, unknown>;
       score?: number;
-    }>();
+    };
 
-    if (!body.type || !body.image_url) {
-      return c.json({ success: false, error: 'type and image_url are required' }, 400);
-    }
+    const sanitizedCaption = body.caption ? sanitizeHtml(body.caption) : null;
 
     const { data: post, error } = await supabaseAdmin
       .from('social_posts')
@@ -129,7 +153,7 @@ social.post('/posts', moderationMiddleware, async (c) => {
         user_id: userId,
         type: body.type,
         image_url: body.image_url,
-        caption: body.caption ?? null,
+        caption: sanitizedCaption,
         occasion: body.occasion ?? null,
         outfit_id: body.outfit_id ?? null,
         outfit_data: body.outfit_data ?? null,
@@ -347,42 +371,13 @@ social.get('/posts/:id/comments', async (c) => {
 
 // ─── POST /social/posts/:id/comments ────────────────────────────────────────
 // Add comment to a post. Content moderation is applied to text fields.
-social.post('/posts/:id/comments', moderationMiddleware, async (c) => {
+social.post('/posts/:id/comments', validateBody(schemas.createComment), moderationMiddleware, async (c) => {
   try {
     const userId = c.get('userId');
     const postId = c.req.param('id');
-    const body = await c.req.json<{ content: string }>();
+    const body = c.get('validatedBody') as { content: string };
 
-    if (!body.content?.trim()) {
-      return c.json({ success: false, error: 'content is required' }, 400);
-    }
-
-    if (body.content.length > 500) {
-      return c.json({ success: false, error: 'Comment must be 500 characters or less' }, 400);
-    }
-
-    // Robust HTML sanitization:
-    // 1. Decode common HTML entities to catch encoded injection attempts
-    let rawContent = body.content.trim()
-      .replace(/&lt;/gi, '<')
-      .replace(/&gt;/gi, '>')
-      .replace(/&amp;/gi, '&')
-      .replace(/&quot;/gi, '"')
-      .replace(/&#x27;/gi, "'")
-      .replace(/&#x2F;/gi, '/')
-      .replace(/&#(\d+);/g, (_, dec: string) => String.fromCharCode(parseInt(dec, 10)))
-      .replace(/&#x([0-9a-fA-F]+);/g, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)));
-    // 2. Strip all HTML/XML tags iteratively (handles nested/malformed tags like <<script>script>)
-    let previous: string;
-    do {
-      previous = rawContent;
-      rawContent = rawContent.replace(/<\/?[^>]+(>|$)/g, '');
-    } while (rawContent !== previous);
-    // 3. Strip any remaining angle brackets that could form tags
-    rawContent = rawContent.replace(/[<>]/g, '');
-    // 4. Remove control characters (keep newlines and tabs)
-    rawContent = rawContent.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
-    const sanitizedContent = rawContent.trim();
+    const sanitizedContent = sanitizeHtml(body.content);
 
     const { data: comment, error } = await supabaseAdmin
       .from('post_comments')
@@ -488,18 +483,16 @@ social.delete('/posts/:id', async (c) => {
 
 // ─── POST /social/stories ───────────────────────────────────────────────────
 // Create a story (expires after 24 hours).
-social.post('/stories', async (c) => {
+social.post('/stories', validateBody(schemas.createStory), async (c) => {
   try {
     const userId = c.get('userId');
-    const body = await c.req.json<{
+    const body = c.get('validatedBody') as {
       image_url: string;
       caption?: string;
       outfit_data?: Record<string, unknown>;
-    }>();
+    };
 
-    if (!body.image_url) {
-      return c.json({ success: false, error: 'image_url is required' }, 400);
-    }
+    const sanitizedCaption = body.caption ? sanitizeHtml(body.caption) : null;
 
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 24);
@@ -510,7 +503,7 @@ social.post('/stories', async (c) => {
         id: uuidv4(),
         user_id: userId,
         image_url: body.image_url,
-        caption: body.caption ?? null,
+        caption: sanitizedCaption,
         outfit_data: body.outfit_data ?? null,
         views_count: 0,
         expires_at: expiresAt.toISOString(),
@@ -681,6 +674,17 @@ social.get('/rankings', async (c) => {
       return c.json({ success: true, data: [] });
     }
 
+    // Refresh materialized view if stale (older than 5 minutes)
+    const now = Date.now();
+    if (now - lastRankingsRefresh > RANKINGS_REFRESH_INTERVAL_MS) {
+      try {
+        await supabaseAdmin.rpc('refresh_rankings');
+        lastRankingsRefresh = now;
+      } catch (refreshErr) {
+        logger.warn({ err: refreshErr }, 'Failed to refresh user_rankings materialized view, using stale data');
+      }
+    }
+
     // Fetch pre-calculated rankings from materialized view
     const { data: rankingsData } = await supabaseAdmin
       .from('user_rankings')
@@ -763,24 +767,15 @@ social.get('/rankings', async (c) => {
 
 // ─── POST /social/report ──────────────────────────────────────────────────
 // Report content for moderation.
-social.post('/report', async (c) => {
+social.post('/report', validateBody(schemas.report), async (c) => {
   try {
     const userId = c.get('userId');
-    const body = await c.req.json<{
+    const body = c.get('validatedBody') as {
       content_type: string;
       content_id: string;
       reason: string;
       description?: string;
-    }>();
-
-    if (!body.content_type || !body.content_id || !body.reason) {
-      return c.json({ success: false, error: 'content_type, content_id, and reason are required' }, 400);
-    }
-
-    const validTypes = ['post', 'comment', 'story', 'user'];
-    if (!validTypes.includes(body.content_type)) {
-      return c.json({ success: false, error: `content_type must be one of: ${validTypes.join(', ')}` }, 400);
-    }
+    };
 
     const { data: report, error } = await supabaseAdmin
       .from('content_reports')
@@ -815,16 +810,12 @@ social.post('/report', async (c) => {
 
 // ─── POST /social/block ──────────────────────────────────────────────────
 // Block a user.
-social.post('/block', async (c) => {
+social.post('/block', validateBody(schemas.blockUser), async (c) => {
   try {
     const userId = c.get('userId');
-    const body = await c.req.json<{
+    const body = c.get('validatedBody') as {
       blocked_user_id: string;
-    }>();
-
-    if (!body.blocked_user_id) {
-      return c.json({ success: false, error: 'blocked_user_id is required' }, 400);
-    }
+    };
 
     if (body.blocked_user_id === userId) {
       return c.json({ success: false, error: 'You cannot block yourself' }, 400);
@@ -1199,6 +1190,99 @@ social.post('/admin/reports/:id/action', async (c) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     logger.error({ err }, 'Admin action failed');
+    return c.json({ success: false, error: message }, 500);
+  }
+});
+
+// ─── DELETE /social/comments/:commentId ──────────────────────────────────────
+// Soft-delete own comment on a post.
+social.delete('/comments/:commentId', async (c) => {
+  try {
+    const userId = c.get('userId');
+    const commentId = c.req.param('commentId');
+
+    // Fetch the comment to verify ownership and get post_id
+    const { data: comment, error: fetchError } = await supabaseAdmin
+      .from('post_comments')
+      .select('id, user_id, post_id')
+      .eq('id', commentId)
+      .is('deleted_at', null)
+      .single();
+
+    if (fetchError || !comment) {
+      return c.json({ success: false, error: 'Comment not found' }, 404);
+    }
+
+    if (comment.user_id !== userId) {
+      return c.json({ success: false, error: 'You can only delete your own comments' }, 403);
+    }
+
+    // Soft delete the comment
+    const { error: deleteError } = await supabaseAdmin
+      .from('post_comments')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', commentId);
+
+    if (deleteError) {
+      return c.json({ success: false, error: deleteError.message }, 500);
+    }
+
+    // Decrement comments_count atomically using RPC
+    const { error: counterError } = await supabaseAdmin.rpc('increment_post_comments', {
+      p_post_id: comment.post_id,
+      p_delta: -1,
+    });
+    if (counterError) {
+      logger.error({ err: counterError, postId: comment.post_id }, 'Failed to decrement comments_count after comment delete');
+    }
+
+    return c.json({ success: true, data: { message: 'Comment deleted successfully' } });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    logger.error({ err }, 'Comment deletion failed');
+    return c.json({ success: false, error: message }, 500);
+  }
+});
+
+// ─── GET /social/blocked-users ───────────────────────────────────────────────
+// List users blocked by the current user, with pagination.
+social.get('/blocked-users', async (c) => {
+  try {
+    const userId = c.get('userId');
+    const page = parseInt(c.req.query('page') ?? '1', 10);
+    const limit = Math.min(parseInt(c.req.query('limit') ?? '20', 10), 50);
+    const offset = (page - 1) * limit;
+
+    const { data: blocks, error, count } = await supabaseAdmin
+      .from('friendships')
+      .select('addressee_id, created_at, addressee:user_profiles!addressee_id(id, full_name, avatar_url)', { count: 'exact' })
+      .eq('requester_id', userId)
+      .eq('status', 'blocked')
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (error) {
+      return c.json({ success: false, error: error.message }, 500);
+    }
+
+    const blockedUsers = (blocks ?? []).map((b) => ({
+      user_id: b.addressee_id,
+      user: b.addressee,
+      blocked_at: b.created_at,
+    }));
+
+    return c.json({
+      success: true,
+      data: blockedUsers,
+      pagination: {
+        page,
+        limit,
+        total: count ?? 0,
+        has_more: (count ?? 0) > offset + limit,
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
     return c.json({ success: false, error: message }, 500);
   }
 });

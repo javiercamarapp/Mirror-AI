@@ -148,7 +148,7 @@ struct ItemDetailView: View {
                                 .frame(width: 14, height: 14)
                                 .overlay(
                                     Circle()
-                                        .strokeBorder(Color.white.opacity(0.3), lineWidth: 1)
+                                        .strokeBorder(Color.white.opacity(0.4), lineWidth: 1)
                                 )
                             Text(item.color)
                                 .font(.system(size: 13))
@@ -286,7 +286,7 @@ struct ItemDetailView: View {
                     if let lastWorn = item.lastWorn {
                         Text("Last worn: \(formatDate(lastWorn))")
                             .font(.system(size: 12))
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(.secondary)
                     }
                 }
 

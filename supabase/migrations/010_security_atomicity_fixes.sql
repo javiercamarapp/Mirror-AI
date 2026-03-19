@@ -120,3 +120,55 @@ BEGIN
   WHERE id = p_post_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================
+-- 5. AUDIT TRIGGERS ON MISSING TABLES
+-- ============================================
+
+-- Audit trigger on moderation_actions (all changes)
+DO $$ BEGIN
+  CREATE TRIGGER audit_moderation_actions
+    AFTER INSERT OR UPDATE OR DELETE ON moderation_actions
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger_func();
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+-- Audit trigger on post_shares (all changes)
+DO $$ BEGIN
+  CREATE TRIGGER audit_post_shares
+    AFTER INSERT OR UPDATE OR DELETE ON post_shares
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger_func();
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+-- Audit trigger on content_reports (status changes)
+DO $$ BEGIN
+  CREATE TRIGGER audit_content_reports
+    AFTER INSERT OR UPDATE OR DELETE ON content_reports
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger_func();
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+-- ============================================
+-- 6. ENABLE RLS ON rate_limits
+-- ============================================
+ALTER TABLE rate_limits ENABLE ROW LEVEL SECURITY;
+
+-- rate_limits is managed by backend/triggers only; no user access needed
+-- Service role (used by backend) bypasses RLS; block direct user access
+DROP POLICY IF EXISTS rate_limits_deny_all ON rate_limits;
+CREATE POLICY rate_limits_deny_all ON rate_limits
+  FOR ALL
+  USING (false);
+
+-- Admin read access for rate_limits
+DROP POLICY IF EXISTS rate_limits_admin_read ON rate_limits;
+CREATE POLICY rate_limits_admin_read ON rate_limits
+  FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM user_profiles
+      WHERE user_profiles.id = auth.uid()
+        AND user_profiles.role = 'admin'
+    )
+  );

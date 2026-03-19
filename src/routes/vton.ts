@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { supabaseAdmin } from '../services/supabase.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { validateBody, schemas } from '../middleware/validate.js';
 import { tryOn } from '../services/fashn.js';
 import { uploadImage } from '../services/storage.js';
 import { logger } from '../services/logger.js';
@@ -23,23 +24,14 @@ const CREDITS_BY_PLAN: Record<string, number> = {
 // Start virtual try-on: uses user's avatar body photo + the garment.
 // Checks & decrements VTON credits. Returns the try-on result image URL.
 // Supports X-Idempotency-Key header for safe retries.
-vton.post('/generate', async (c) => {
+vton.post('/generate', validateBody(schemas.vtonGenerate), async (c) => {
   try {
     const userId = c.get('userId');
     const idempotencyKey = c.req.header('X-Idempotency-Key') ?? null;
-    const body = await c.req.json<{
+    const body = c.get('validatedBody') as {
       garment_image_url: string;
       category: 'tops' | 'bottoms' | 'one-pieces';
-    }>();
-
-    if (!body.garment_image_url || !body.category) {
-      return c.json({ success: false, error: 'garment_image_url and category are required' }, 400);
-    }
-
-    const validCategories = ['tops', 'bottoms', 'one-pieces'];
-    if (!validCategories.includes(body.category)) {
-      return c.json({ success: false, error: 'category must be one of: tops, bottoms, one-pieces' }, 400);
-    }
+    };
 
     // Idempotency: if this request was already processed, return the cached result
     if (idempotencyKey) {

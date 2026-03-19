@@ -10,6 +10,56 @@ const auth = new Hono<{ Variables: AppVariables }>();
 // Rate limiting for /auth/ routes is handled by the global rate limiter middleware
 // in index.ts (10 requests per 15 minutes for /api/auth/ paths).
 
+// ─── Per-user/per-email rate limiting on auth endpoints (10 req/hour) ────────
+const authRateLimitMap = new Map<string, { count: number; resetAt: number }>();
+
+async function checkAuthRateLimit(identifier: string): Promise<{ allowed: boolean; retryAfter: number }> {
+  const windowMs = 3_600_000; // 1 hour
+  const limit = 10;
+  const now = Date.now();
+
+  // Try Redis first
+  const redis = getRedisClient();
+  if (redis) {
+    try {
+      const key = `rl:auth:${identifier}`;
+      const windowStart = now - windowMs;
+      const member = `${now}:${Math.random().toString(36).slice(2, 8)}`;
+
+      const pipeline = redis.pipeline();
+      pipeline.zremrangebyscore(key, 0, windowStart);
+      pipeline.zadd(key, now, member);
+      pipeline.zcard(key);
+      pipeline.pexpire(key, windowMs);
+
+      const results = await pipeline.exec();
+      const count = (results?.[2]?.[1] as number) ?? 0;
+      const retryAfter = Math.ceil(windowMs / 1000);
+      return { allowed: count <= limit, retryAfter };
+    } catch {
+      // Fall through to in-memory
+    }
+  }
+
+  // In-memory fallback
+  const entry = authRateLimitMap.get(identifier);
+  if (!entry || now > entry.resetAt) {
+    authRateLimitMap.set(identifier, { count: 1, resetAt: now + windowMs });
+    return { allowed: true, retryAfter: 0 };
+  }
+  entry.count++;
+  const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
+  return { allowed: entry.count <= limit, retryAfter };
+}
+
+// Periodic cleanup of expired in-memory auth rate limit entries
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of authRateLimitMap) {
+    if (now > entry.resetAt) authRateLimitMap.delete(key);
+  }
+}, 60_000);
+
 // ─── Token format validation ─────────────────────────────────────────────────
 function isValidJWTFormat(token: string): boolean {
   // JWTs have 3 base64url-encoded segments separated by dots
@@ -80,8 +130,8 @@ auth.post('/apple', async (c) => {
       return c.json({ success: false, error: 'id_token is required' }, 400);
     }
 
-    // Size limits: id_token max 8KB, full_name max 200 chars
-    if (body.id_token.length > 8192) {
+    // Size limits: id_token max 10KB, full_name max 200 chars
+    if (body.id_token.length > 10240) {
       return c.json({ success: false, error: 'id_token exceeds maximum allowed size' }, 400);
     }
     if (body.full_name && body.full_name.length > 200) {
@@ -91,6 +141,20 @@ auth.post('/apple', async (c) => {
     // Validate token format before sending to Supabase
     if (!isValidJWTFormat(body.id_token)) {
       return c.json({ success: false, error: 'Invalid id_token format' }, 400);
+    }
+
+    // Per-user rate limit: extract email-like identifier from JWT payload for keying
+    try {
+      const payloadB64 = body.id_token.split('.')[1] ?? '';
+      const payloadJson = JSON.parse(Buffer.from(payloadB64, 'base64url').toString());
+      const identifier = payloadJson.email ?? payloadJson.sub ?? 'unknown';
+      const rl = await checkAuthRateLimit(`apple:${identifier}`);
+      if (!rl.allowed) {
+        c.header('Retry-After', String(rl.retryAfter));
+        return c.json({ success: false, error: 'Too many authentication attempts. Please try again later.' }, 429);
+      }
+    } catch {
+      // If we can't parse the token for rate limiting, still allow through (format was validated above)
     }
 
     const { data: sessionData, error: signInError } =
@@ -166,14 +230,28 @@ auth.post('/google', async (c) => {
       return c.json({ success: false, error: 'id_token is required' }, 400);
     }
 
-    // Size limit: id_token max 8KB
-    if (body.id_token.length > 8192) {
+    // Size limit: id_token max 10KB
+    if (body.id_token.length > 10240) {
       return c.json({ success: false, error: 'id_token exceeds maximum allowed size' }, 400);
     }
 
     // Validate token format before sending to Supabase
     if (!isValidJWTFormat(body.id_token)) {
       return c.json({ success: false, error: 'Invalid id_token format' }, 400);
+    }
+
+    // Per-user rate limit: extract email-like identifier from JWT payload for keying
+    try {
+      const payloadB64 = body.id_token.split('.')[1] ?? '';
+      const payloadJson = JSON.parse(Buffer.from(payloadB64, 'base64url').toString());
+      const identifier = payloadJson.email ?? payloadJson.sub ?? 'unknown';
+      const rl = await checkAuthRateLimit(`google:${identifier}`);
+      if (!rl.allowed) {
+        c.header('Retry-After', String(rl.retryAfter));
+        return c.json({ success: false, error: 'Too many authentication attempts. Please try again later.' }, 429);
+      }
+    } catch {
+      // If we can't parse the token for rate limiting, still allow through (format was validated above)
     }
 
     const { data: sessionData, error: signInError } =
@@ -241,6 +319,13 @@ auth.post('/magic-link', async (c) => {
       return c.json({ success: false, error: 'email is required' }, 400);
     }
 
+    // Per-email rate limit: 10 attempts per hour
+    const mlRl = await checkAuthRateLimit(`magic-link:${body.email.toLowerCase().trim()}`);
+    if (!mlRl.allowed) {
+      c.header('Retry-After', String(mlRl.retryAfter));
+      return c.json({ success: false, error: 'Too many magic link requests. Please try again later.' }, 429);
+    }
+
     const { error } = await supabaseAdmin.auth.signInWithOtp({
       email: body.email,
     });
@@ -272,6 +357,18 @@ auth.post('/signup', async (c) => {
 
     if (!body.id || !body.email || !body.name) {
       return c.json({ success: false, error: 'id, email, and name are required' }, 400);
+    }
+
+    // Input length validation
+    if (body.name.length > 200) {
+      return c.json({ success: false, error: 'name must be 200 characters or less' }, 400);
+    }
+
+    // Per-email rate limit: 10 attempts per hour
+    const suRl = await checkAuthRateLimit(`signup:${body.email.toLowerCase().trim()}`);
+    if (!suRl.allowed) {
+      c.header('Retry-After', String(suRl.retryAfter));
+      return c.json({ success: false, error: 'Too many signup attempts. Please try again later.' }, 429);
     }
 
     const { data: existing } = await supabaseAdmin

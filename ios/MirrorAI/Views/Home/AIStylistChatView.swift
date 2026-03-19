@@ -180,7 +180,7 @@ struct AIStylistChatView: View {
 
                 Text(formatTime(message.timestamp))
                     .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
             }
 
             if message.role != "user" {

@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { supabaseAdmin } from '../services/supabase.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { validateBody, schemas } from '../middleware/validate.js';
 import { getUserPlan, checkAIChatLimit } from '../middleware/subscription.js';
 import { generateText, generateJSON, analyzeImageJSON } from '../services/gemini.js';
 import { logger } from '../services/logger.js';
@@ -123,7 +124,7 @@ INPUT BOUNDARY RULES:
 
 // ─── POST /ai/chat ──────────────────────────────────────────────────────────
 // Stylist chat: accepts a message and optional history, returns AI response.
-ai.post('/chat', async (c) => {
+ai.post('/chat', validateBody(schemas.aiChat), async (c) => {
   try {
     const userId = c.get('userId');
 
@@ -138,18 +139,10 @@ ai.post('/chat', async (c) => {
       }, 429);
     }
 
-    const body = await c.req.json<{
+    const body = c.get('validatedBody') as {
       message: string;
       history?: Array<{ role: string; content: string }>;
-    }>();
-
-    if (!body.message?.trim()) {
-      return c.json({ success: false, error: 'message is required' }, 400);
-    }
-
-    if (body.message.length > 2000) {
-      return c.json({ success: false, error: 'Message must be 2000 characters or less' }, 400);
-    }
+    };
 
     // Fetch user profile for context
     const { data: profile } = await supabaseAdmin
@@ -215,7 +208,7 @@ ${wardrobeSummary}`;
 
 // ─── POST /ai/analyze-outfit ────────────────────────────────────────────────
 // Analyze an outfit photo. Returns score, strengths, and improvements.
-ai.post('/analyze-outfit', async (c) => {
+ai.post('/analyze-outfit', validateBody(schemas.analyzeOutfit), async (c) => {
   try {
     const userId = c.get('userId');
 
@@ -229,14 +222,10 @@ ai.post('/analyze-outfit', async (c) => {
       }, 429);
     }
 
-    const body = await c.req.json<{
-      image: string; // base64
+    const body = c.get('validatedBody') as {
+      image: string;
       occasion?: string;
-    }>();
-
-    if (!body.image) {
-      return c.json({ success: false, error: 'image (base64) is required' }, 400);
-    }
+    };
 
     // Strip data:image/... prefix if present
     const base64 = body.image.replace(/^data:image\/\w+;base64,/, '');
@@ -308,7 +297,7 @@ Return JSON with:
 
 // ─── POST /ai/analyze-colors ────────────────────────────────────────────────
 // Color season analysis from selfie. Returns color season, best colors, palette.
-ai.post('/analyze-colors', async (c) => {
+ai.post('/analyze-colors', validateBody(schemas.analyzeColors), async (c) => {
   try {
     const userId = c.get('userId');
 
@@ -321,13 +310,9 @@ ai.post('/analyze-colors', async (c) => {
         error: `Daily AI limit reached (${rateCheck.limit} per day on ${plan} plan). Upgrade for more.`,
       }, 429);
     }
-    const body = await c.req.json<{
-      image: string; // base64
-    }>();
-
-    if (!body.image) {
-      return c.json({ success: false, error: 'image (base64) is required' }, 400);
-    }
+    const body = c.get('validatedBody') as {
+      image: string;
+    };
 
     const base64 = body.image.replace(/^data:image\/\w+;base64,/, '');
 
@@ -375,7 +360,7 @@ Return JSON with:
 
 // ─── POST /ai/identify-garment ──────────────────────────────────────────────
 // Identify garment from photo. Returns category, color, brand guess, style tags.
-ai.post('/identify-garment', async (c) => {
+ai.post('/identify-garment', validateBody(schemas.identifyGarment), async (c) => {
   try {
     const userId = c.get('userId');
 
@@ -388,13 +373,9 @@ ai.post('/identify-garment', async (c) => {
         error: `Daily AI limit reached (${rateCheck.limit} per day on ${plan} plan). Upgrade for more.`,
       }, 429);
     }
-    const body = await c.req.json<{
-      image: string; // base64
-    }>();
-
-    if (!body.image) {
-      return c.json({ success: false, error: 'image (base64) is required' }, 400);
-    }
+    const body = c.get('validatedBody') as {
+      image: string;
+    };
 
     const base64 = body.image.replace(/^data:image\/\w+;base64,/, '');
 
@@ -442,7 +423,7 @@ Return JSON with:
 
 // ─── POST /ai/shopping-recs ────────────────────────────────────────────────
 // Get shopping recommendations based on wardrobe gaps.
-ai.post('/shopping-recs', async (c) => {
+ai.post('/shopping-recs', validateBody(schemas.shoppingRecs), async (c) => {
   try {
     const userId = c.get('userId');
 
@@ -456,22 +437,11 @@ ai.post('/shopping-recs', async (c) => {
       }, 429);
     }
 
-    const body = await c.req.json<{
+    const body = c.get('validatedBody') as {
       gaps?: string[];
       budget?: string;
       occasion?: string;
-    }>();
-
-    // Input length limits for user-provided fields
-    if (body.budget && body.budget.length > 100) {
-      return c.json({ success: false, error: 'Budget must be 100 characters or less' }, 400);
-    }
-    if (body.occasion && body.occasion.length > 100) {
-      return c.json({ success: false, error: 'Occasion must be 100 characters or less' }, 400);
-    }
-    if (body.gaps && body.gaps.length > 20) {
-      return c.json({ success: false, error: 'Maximum 20 wardrobe gaps allowed' }, 400);
-    }
+    };
 
     // Fetch user profile
     const { data: profile } = await supabaseAdmin

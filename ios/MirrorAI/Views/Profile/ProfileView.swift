@@ -358,7 +358,7 @@ struct ProfileView: View {
 
                         Text(L10n.profileShareOutfits)
                             .font(.caption)
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 24)

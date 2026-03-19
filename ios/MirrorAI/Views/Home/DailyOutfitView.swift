@@ -140,7 +140,7 @@ struct DailyOutfitView: View {
 
             Text("Analyzing your wardrobe, color palette,\nand style preferences")
                 .font(.system(size: 14))
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }
     }

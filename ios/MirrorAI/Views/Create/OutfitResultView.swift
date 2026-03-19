@@ -204,7 +204,7 @@ struct OutfitResultView: View {
                         .frame(width: 8, height: 8)
                     Text(item.color)
                         .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(.secondary)
                 }
             }
         }

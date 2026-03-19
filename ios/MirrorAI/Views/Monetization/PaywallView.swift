@@ -29,7 +29,7 @@ struct PaywallView: View {
             VStack(spacing: 24) {
                 // Dismiss handle
                 Capsule()
-                    .fill(Color.white.opacity(0.3))
+                    .fill(Color.white.opacity(0.4))
                     .frame(width: 36, height: 5)
                     .padding(.top, 12)
 

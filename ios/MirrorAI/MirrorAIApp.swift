@@ -112,7 +112,7 @@ enum MirrorTheme {
     )
 
     static let surfaceColor = Color.white.opacity(0.06)
-    static let borderColor = Color.white.opacity(0.12)
+    static let borderColor = Color.white.opacity(0.4)
     static let cardRadius: CGFloat = 20
     static let buttonRadius: CGFloat = 16
 

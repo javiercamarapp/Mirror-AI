@@ -18,8 +18,8 @@ struct GlassCard<Content: View>: View {
                             .strokeBorder(
                                 LinearGradient(
                                     colors: [
-                                        Color.white.opacity(0.15),
-                                        Color.white.opacity(0.05)
+                                        Color.white.opacity(0.4),
+                                        Color.white.opacity(0.4)
                                     ],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
@@ -47,8 +47,8 @@ struct GlassCardModifier: ViewModifier {
                             .strokeBorder(
                                 LinearGradient(
                                     colors: [
-                                        Color.white.opacity(0.15),
-                                        Color.white.opacity(0.05)
+                                        Color.white.opacity(0.4),
+                                        Color.white.opacity(0.4)
                                     ],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing

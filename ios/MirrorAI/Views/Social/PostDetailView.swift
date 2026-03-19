@@ -102,7 +102,7 @@ struct PostDetailView: View {
                         // Timestamp
                         Text(relativeTime(from: currentPost.createdAt))
                             .font(.system(size: 12))
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(.secondary)
                             .padding(.horizontal, 16)
 
                         // Divider
@@ -293,7 +293,7 @@ struct PostDetailView: View {
 
                     Text(relativeTime(from: comment.createdAt))
                         .font(.system(size: 11))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(.secondary)
                 }
 
                 Text(comment.content)

@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import sharp from 'sharp';
 import { supabaseAdmin } from '../services/supabase.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { validateBody, schemas } from '../middleware/validate.js';
 import { uploadImage, deleteImage, extractPathFromUrl } from '../services/storage.js';
 import { removeBackground } from '../services/rembg.js';
 import { analyzeImageJSON } from '../services/gemini.js';
@@ -80,11 +81,11 @@ wardrobe.get('/', async (c) => {
 // ─── POST /wardrobe ─────────────────────────────────────────────────────────
 // Add item: accepts image upload (base64), removes background, uses Gemini to
 // identify/categorize, saves to DB + Storage.
-wardrobe.post('/', async (c) => {
+wardrobe.post('/', validateBody(schemas.addWardrobeItemWithImage), async (c) => {
   try {
     const userId = c.get('userId');
-    const body = await c.req.json<{
-      image: string; // base64
+    const body = c.get('validatedBody') as {
+      image: string;
       name?: string;
       category?: WardrobeCategory;
       subcategory?: string;
@@ -92,11 +93,7 @@ wardrobe.post('/', async (c) => {
       brand?: string;
       season?: Season[];
       occasions?: Occasion[];
-    }>();
-
-    if (!body.image) {
-      return c.json({ success: false, error: 'image (base64) is required' }, 400);
-    }
+    };
 
     // Validate image size (max 10MB base64)
     const maxBase64Size = 10 * 1024 * 1024 * 4 / 3; // ~13.3MB base64 for 10MB binary
@@ -360,37 +357,19 @@ wardrobe.get('/:id', async (c) => {
 });
 
 // ─── PATCH /wardrobe/:id ────────────────────────────────────────────────────
-wardrobe.patch('/:id', async (c) => {
+wardrobe.patch('/:id', validateBody(schemas.updateWardrobeItem), async (c) => {
   try {
     const userId = c.get('userId');
     const itemId = c.req.param('id');
-    const updates = await c.req.json();
+    const updates = c.get('validatedBody') as Record<string, unknown>;
 
-    const allowedFields = [
-      'name',
-      'category',
-      'subcategory',
-      'color',
-      'brand',
-      'season',
-      'occasions',
-      'is_favorite',
-    ];
-
-    const sanitized: Record<string, unknown> = {};
-    for (const key of allowedFields) {
-      if (key in updates) {
-        sanitized[key] = updates[key];
-      }
-    }
-
-    if (Object.keys(sanitized).length === 0) {
+    if (Object.keys(updates).length === 0) {
       return c.json({ success: false, error: 'No valid fields to update' }, 400);
     }
 
     const { data, error } = await supabaseAdmin
       .from('wardrobe_items')
-      .update(sanitized)
+      .update(updates)
       .eq('id', itemId)
       .eq('user_id', userId)
       .select()

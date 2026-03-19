@@ -184,7 +184,7 @@ struct TryOnResultView: View {
                     if let brand = garmentItem.brand, !brand.isEmpty {
                         Text(brand)
                             .font(.system(size: 12))
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(.secondary)
                     }
                 }
 
@@ -288,7 +288,7 @@ struct TryOnResultView: View {
         Task {
             guard let url = URL(string: resultImageUrl) else { return }
             do {
-                let (data, _) = try await URLSession.shared.data(from: url)
+                let (data, _) = try await URLSession.pinned().data(from: url)
                 if let image = UIImage(data: data) {
                     UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
                     withAnimation {

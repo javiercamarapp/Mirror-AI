@@ -142,7 +142,7 @@ struct CommentsSheetView: View {
 
                     Text(relativeTime(from: comment.createdAt))
                         .font(.system(size: 11))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(.secondary)
                 }
 
                 Text(comment.content)
@@ -424,7 +424,7 @@ struct CommentsSheetView: View {
                 let body: [String: String] = ["commentId": commentId, "reason": selectedReportReason.rawValue]
                 request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-                let (_, response) = try await URLSession.shared.data(for: request)
+                let (_, response) = try await URLSession.pinned().data(for: request)
                 guard let httpResponse = response as? HTTPURLResponse,
                       (200...299).contains(httpResponse.statusCode) else {
                     throw URLError(.badServerResponse)
@@ -464,7 +464,7 @@ struct CommentsSheetView: View {
                 let body: [String: String] = ["userId": userId]
                 request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-                let (_, response) = try await URLSession.shared.data(for: request)
+                let (_, response) = try await URLSession.pinned().data(for: request)
                 guard let httpResponse = response as? HTTPURLResponse,
                       (200...299).contains(httpResponse.statusCode) else {
                     throw URLError(.badServerResponse)

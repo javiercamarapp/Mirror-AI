@@ -367,7 +367,7 @@ struct AvatarTryOnView: View {
 
         Task {
             do {
-                let (data, _) = try await URLSession.shared.data(from: url)
+                let (data, _) = try await URLSession.pinned().data(from: url)
                 if let image = UIImage(data: data) {
                     UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
                     withAnimation { savedToPhotos = true }

@@ -331,7 +331,7 @@ struct SubscriptionView: View {
         VStack(spacing: 12) {
             Text("Payment will be charged to your iTunes Account at confirmation of purchase. Subscriptions automatically renew unless cancelled at least 24 hours before the end of the current period. Your account will be charged for renewal within 24 hours prior to the end of the current period.")
                 .font(.system(size: 11))
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 
             VStack(spacing: 6) {
@@ -341,7 +341,7 @@ struct SubscriptionView: View {
 
                 Text("Settings > Apple ID > Subscriptions > Mirror AI > Cancel Subscription")
                     .font(.system(size: 11))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
 

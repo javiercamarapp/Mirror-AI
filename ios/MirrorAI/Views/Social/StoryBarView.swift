@@ -95,7 +95,7 @@ struct StoryBarView: View {
                     .strokeBorder(
                         group.hasUnviewed
                             ? AnyShapeStyle(MirrorTheme.gradientPrimary)
-                            : AnyShapeStyle(Color.gray.opacity(0.3)),
+                            : AnyShapeStyle(Color.gray.opacity(0.4)),
                         lineWidth: group.hasUnviewed ? 3 : 2
                     )
                     .frame(width: 72, height: 72)

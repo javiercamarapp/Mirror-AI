@@ -140,7 +140,7 @@ struct NotificationsView: View {
 
                     Text(timeAgo(from: notification.createdAt))
                         .font(.system(size: 11))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(.secondary)
                 }
 
                 Spacer()

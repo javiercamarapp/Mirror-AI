@@ -66,7 +66,7 @@ struct OnboardingView: View {
         HStack(spacing: 8) {
             ForEach(0..<totalSteps, id: \.self) { step in
                 Capsule()
-                    .fill(step <= currentStep ? AnyShapeStyle(MirrorTheme.gradientPrimary) : AnyShapeStyle(Color.white.opacity(0.2)))
+                    .fill(step <= currentStep ? AnyShapeStyle(MirrorTheme.gradientPrimary) : AnyShapeStyle(Color.white.opacity(0.4)))
                     .frame(height: 4)
                     .animation(reduceMotion ? .none : .spring(response: 0.3), value: currentStep)
             }
@@ -198,7 +198,7 @@ struct OnboardingView: View {
                     .fill(selectedAgeRange == value ? AnyShapeStyle(MirrorTheme.gradientPrimary) : AnyShapeStyle(Color.white.opacity(0.08)))
                     .overlay(
                         RoundedRectangle(cornerRadius: 18)
-                            .strokeBorder(selectedAgeRange == value ? Color.clear : Color.white.opacity(0.12), lineWidth: 1)
+                            .strokeBorder(selectedAgeRange == value ? Color.clear : Color.white.opacity(0.4), lineWidth: 1)
                     )
             )
         }
@@ -239,7 +239,7 @@ struct OnboardingView: View {
                         .fill(Color.white.opacity(0.1))
                         .overlay(
                             RoundedRectangle(cornerRadius: 16)
-                                .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
+                                .strokeBorder(Color.white.opacity(0.4), lineWidth: 1)
                         )
                 )
                 .textInputAutocapitalization(.words)
@@ -321,7 +321,7 @@ struct OnboardingView: View {
                     .fill(selectedGender == gender ? AnyShapeStyle(MirrorTheme.gradientPrimary) : AnyShapeStyle(Color.white.opacity(0.08)))
                     .overlay(
                         RoundedRectangle(cornerRadius: 18)
-                            .strokeBorder(selectedGender == gender ? Color.clear : Color.white.opacity(0.12), lineWidth: 1)
+                            .strokeBorder(selectedGender == gender ? Color.clear : Color.white.opacity(0.4), lineWidth: 1)
                     )
             )
         }
@@ -374,7 +374,7 @@ struct OnboardingView: View {
                         .fill(Color.white.opacity(0.08))
                         .overlay(
                             RoundedRectangle(cornerRadius: 18)
-                                .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
+                                .strokeBorder(Color.white.opacity(0.4), lineWidth: 1)
                         )
                 )
 
@@ -426,7 +426,7 @@ struct OnboardingView: View {
                     .fill(selectedBodyShape == shape ? AnyShapeStyle(MirrorTheme.gradientPrimary) : AnyShapeStyle(Color.white.opacity(0.08)))
                     .overlay(
                         RoundedRectangle(cornerRadius: 16)
-                            .strokeBorder(selectedBodyShape == shape ? Color.clear : Color.white.opacity(0.12), lineWidth: 1)
+                            .strokeBorder(selectedBodyShape == shape ? Color.clear : Color.white.opacity(0.4), lineWidth: 1)
                     )
             )
         }
@@ -511,7 +511,7 @@ struct OnboardingView: View {
                     .fill(isSelected ? AnyShapeStyle(MirrorTheme.gradientPrimary) : AnyShapeStyle(Color.white.opacity(0.08)))
                     .overlay(
                         RoundedRectangle(cornerRadius: 14)
-                            .strokeBorder(isSelected ? Color.clear : Color.white.opacity(0.12), lineWidth: 1)
+                            .strokeBorder(isSelected ? Color.clear : Color.white.opacity(0.4), lineWidth: 1)
                     )
             )
             .scaleEffect(isSelected ? 1.05 : 1.0)
@@ -618,7 +618,7 @@ struct OnboardingView: View {
                         .frame(width: 54, height: 54)
                         .background(
                             Circle()
-                                .fill(Color.white.opacity(0.12))
+                                .fill(Color.white.opacity(0.2))
                         )
                 }
                 .accessibilityLabel("Go back")

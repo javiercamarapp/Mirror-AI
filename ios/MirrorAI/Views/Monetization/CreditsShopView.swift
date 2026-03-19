@@ -137,7 +137,7 @@ struct CreditsShopView: View {
 
                 Text("Use credits for virtual try-on sessions")
                     .font(.system(size: 13))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)

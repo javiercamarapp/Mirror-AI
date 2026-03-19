@@ -27,7 +27,7 @@ struct SettingsView: View {
                                 .foregroundStyle(.secondary)
                             Text(appState.currentUser?.email ?? "")
                                 .font(.system(size: 12))
-                                .foregroundStyle(.tertiary)
+                                .foregroundStyle(.secondary)
                         }
                     }
 
@@ -317,7 +317,7 @@ struct SettingsView: View {
                 var request = URLRequest(url: url)
                 request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
-                let (data, _) = try await URLSession.shared.data(for: request)
+                let (data, _) = try await URLSession.pinned().data(for: request)
 
                 // Share the JSON data
                 let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("mirror_ai_export.json")
@@ -360,7 +360,7 @@ struct SettingsView: View {
                     request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
                 }
 
-                let (_, response) = try await URLSession.shared.data(for: request)
+                let (_, response) = try await URLSession.pinned().data(for: request)
                 guard let httpResponse = response as? HTTPURLResponse,
                       (200...299).contains(httpResponse.statusCode) else {
                     throw URLError(.badServerResponse)

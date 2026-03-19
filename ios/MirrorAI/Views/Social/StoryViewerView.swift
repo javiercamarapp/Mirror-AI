@@ -143,7 +143,7 @@ struct StoryViewerView: View {
                     ZStack(alignment: .leading) {
                         // Background
                         Capsule()
-                            .fill(Color.white.opacity(0.3))
+                            .fill(Color.white.opacity(0.4))
 
                         // Fill
                         Capsule()
@@ -175,13 +175,13 @@ struct StoryViewerView: View {
                let url = URL(string: avatarUrl) {
                 CachedAsyncImage(url: url) {
                     Circle()
-                        .fill(Color.white.opacity(0.2))
+                        .fill(Color.white.opacity(0.4))
                 }
                 .frame(width: 36, height: 36)
                 .clipShape(Circle())
             } else {
                 Circle()
-                    .fill(Color.white.opacity(0.2))
+                    .fill(Color.white.opacity(0.4))
                     .frame(width: 36, height: 36)
                     .overlay {
                         Image(systemName: "person.fill")
@@ -211,7 +211,7 @@ struct StoryViewerView: View {
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(.white)
                     .padding(8)
-                    .background(Circle().fill(Color.white.opacity(0.15)))
+                    .background(Circle().fill(Color.white.opacity(0.4)))
             }
             .accessibilityLabel(L10n.a11yCloseButton)
         .accessibilityHint("Closes the story viewer")

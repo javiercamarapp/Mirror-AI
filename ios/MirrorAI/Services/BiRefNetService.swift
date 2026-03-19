@@ -35,7 +35,7 @@ class BiRefNetService {
             throw APIError.invalidURL
         }
 
-        let (downloadedData, response) = try await URLSession.shared.data(from: resultUrl)
+        let (downloadedData, response) = try await URLSession.pinned().data(from: resultUrl)
 
         guard let httpResponse = response as? HTTPURLResponse,
               (200...299).contains(httpResponse.statusCode) else {

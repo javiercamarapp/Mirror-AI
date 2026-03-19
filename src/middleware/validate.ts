@@ -116,4 +116,66 @@ export const schemas = {
   blockUser: z.object({
     blocked_user_id: z.string().uuid(),
   }),
+
+  // AI
+  aiChat: z.object({
+    message: z.string().min(1, 'Message is required').max(2000),
+    history: z.array(z.object({
+      role: z.string(),
+      content: z.string(),
+    })).optional(),
+  }),
+  analyzeOutfit: z.object({
+    image: z.string().min(1, 'image (base64) is required'),
+    occasion: z.string().max(100).optional(),
+  }),
+  analyzeColors: z.object({
+    image: z.string().min(1, 'image (base64) is required'),
+  }),
+  identifyGarment: z.object({
+    image: z.string().min(1, 'image (base64) is required'),
+  }),
+  shoppingRecs: z.object({
+    gaps: z.array(z.string().max(200)).max(20).optional(),
+    budget: z.string().max(100).optional(),
+    occasion: z.string().max(100).optional(),
+  }),
+
+  // VTON
+  vtonGenerate: z.object({
+    garment_image_url: z.string().url(),
+    category: z.enum(['tops', 'bottoms', 'one-pieces']),
+  }),
+
+  // Wardrobe
+  addWardrobeItemWithImage: z.object({
+    image: z.string().min(1, 'image (base64) is required'),
+    name: z.string().min(1).max(100).optional(),
+    category: z.enum([
+      'tops', 'bottoms', 'dresses', 'outerwear', 'shoes',
+      'accessories', 'bags', 'activewear', 'swimwear', 'formal',
+    ]).optional(),
+    subcategory: z.string().max(50).optional(),
+    color: z.string().max(50).optional(),
+    brand: z.string().max(100).optional(),
+    season: z.array(z.enum(['spring', 'summer', 'fall', 'winter', 'all'])).optional(),
+    occasions: z.array(z.enum([
+      'casual', 'work', 'formal', 'date', 'party', 'sport', 'travel', 'beach',
+    ])).optional(),
+  }),
+  updateWardrobeItem: z.object({
+    name: z.string().min(1).max(100).optional(),
+    category: z.enum([
+      'tops', 'bottoms', 'dresses', 'outerwear', 'shoes',
+      'accessories', 'bags', 'activewear', 'swimwear', 'formal',
+    ]).optional(),
+    subcategory: z.string().max(50).optional(),
+    color: z.string().max(50).optional(),
+    brand: z.string().max(100).optional(),
+    season: z.array(z.enum(['spring', 'summer', 'fall', 'winter', 'all'])).optional(),
+    occasions: z.array(z.enum([
+      'casual', 'work', 'formal', 'date', 'party', 'sport', 'travel', 'beach',
+    ])).optional(),
+    is_favorite: z.boolean().optional(),
+  }),
 };

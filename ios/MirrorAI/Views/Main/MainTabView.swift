@@ -60,7 +60,7 @@ struct MainTabView: View {
                     Rectangle()
                         .fill(
                             LinearGradient(
-                                colors: [Color.white.opacity(0.08), Color.clear],
+                                colors: [Color.white.opacity(0.4), Color.clear],
                                 startPoint: .top,
                                 endPoint: .bottom
                             )
@@ -68,7 +68,7 @@ struct MainTabView: View {
                 )
                 .overlay(alignment: .top) {
                     Rectangle()
-                        .fill(Color.white.opacity(0.1))
+                        .fill(Color.white.opacity(0.4))
                         .frame(height: 0.5)
                 }
                 .ignoresSafeArea()

@@ -159,7 +159,7 @@ struct TryOnHistoryView: View {
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 30))
-                            .foregroundStyle(.white.opacity(0.8))
+                            .foregroundStyle(.white.opacity(0.85))
                             .background(Circle().fill(.black.opacity(0.3)))
                     }
                     .padding(20)
@@ -226,7 +226,7 @@ struct TryOnHistoryView: View {
         Task {
             guard let imageUrl = URL(string: url) else { return }
             do {
-                let (data, _) = try await URLSession.shared.data(from: imageUrl)
+                let (data, _) = try await URLSession.pinned().data(from: imageUrl)
                 if let image = UIImage(data: data) {
                     UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
                     let success = UINotificationFeedbackGenerator()

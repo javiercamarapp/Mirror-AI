@@ -189,7 +189,7 @@ struct EditProfileView: View {
 
             Text("Used for virtual try-on and avatar generation")
                 .font(.system(size: 12))
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(.secondary)
 
             Button {
                 let impact = UIImpactFeedbackGenerator(style: .light)

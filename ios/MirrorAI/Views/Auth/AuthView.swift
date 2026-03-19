@@ -160,7 +160,7 @@ struct AuthView: View {
                         .fill(Color.white.opacity(0.15))
                         .overlay(
                             RoundedRectangle(cornerRadius: MirrorTheme.buttonRadius)
-                                .strokeBorder(Color.white.opacity(0.25), lineWidth: 1)
+                                .strokeBorder(Color.white.opacity(0.4), lineWidth: 1)
                         )
                 )
             }
@@ -187,7 +187,7 @@ struct AuthView: View {
                         .fill(Color.white.opacity(0.08))
                         .overlay(
                             RoundedRectangle(cornerRadius: MirrorTheme.buttonRadius)
-                                .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+                                .strokeBorder(Color.white.opacity(0.4), lineWidth: 1)
                         )
                 )
             }
