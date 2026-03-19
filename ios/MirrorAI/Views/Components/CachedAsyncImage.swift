@@ -115,8 +115,8 @@ struct CachedAsyncImage<Placeholder: View>: View {
             return
         }
 
-        // Check disk cache
-        if let diskCached = DiskImageCache.shared.get(for: url) {
+        // Check disk cache (with 24-hour TTL)
+        if let diskCached = DiskImageCache.shared.get(for: url, maxAge: 86_400) {
             // Promote to memory cache
             ImageCache.shared.set(diskCached, for: url)
             let transition: Animation? = reduceMotion ? nil : .easeOut(duration: 0.2)
@@ -197,9 +197,26 @@ final class DiskImageCache: @unchecked Sendable {
     }
 
     /// Retrieve an image from the disk cache.
-    func get(for url: URL) -> UIImage? {
+    /// - Parameters:
+    ///   - url: The URL used as cache key.
+    ///   - maxAge: Maximum age in seconds before the cached entry is considered stale.
+    ///            Pass `nil` for no TTL check (default). Pass `86_400` for 24 hours.
+    func get(for url: URL, maxAge: TimeInterval? = nil) -> UIImage? {
         let filePath = cacheFilePath(for: url)
         guard fileManager.fileExists(atPath: filePath.path) else { return nil }
+
+        // Check TTL if maxAge is specified
+        if let maxAge {
+            if let attrs = try? fileManager.attributesOfItem(atPath: filePath.path),
+               let creationDate = attrs[.creationDate] as? Date {
+                let age = Date().timeIntervalSince(creationDate)
+                if age > maxAge {
+                    // Cache entry is stale, remove it and return nil to force re-fetch
+                    try? fileManager.removeItem(at: filePath)
+                    return nil
+                }
+            }
+        }
 
         // Update access date for LRU tracking
         try? fileManager.setAttributes(

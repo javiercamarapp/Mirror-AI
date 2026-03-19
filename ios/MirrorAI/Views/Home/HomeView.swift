@@ -69,7 +69,7 @@ struct HomeView: View {
         .refreshable {
             await refreshData()
         }
-        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+        .dynamicTypeSize(...DynamicTypeSize.accessibility5)
     }
 
     // MARK: - Greeting
@@ -416,7 +416,7 @@ struct HomeView: View {
 
                     Text(L10n.homeUnlockSubtitle)
                         .font(.caption2)
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(.white.opacity(0.85))
                 }
 
                 Spacer()

@@ -29,6 +29,7 @@ struct GlassCard<Content: View>: View {
                     )
                     .shadow(color: Color.black.opacity(0.15), radius: 12, x: 0, y: 6)
             )
+            .accessibilityElement(children: .combine)
     }
 }
 
@@ -57,6 +58,7 @@ struct GlassCardModifier: ViewModifier {
                     )
                     .shadow(color: Color.black.opacity(0.15), radius: 12, x: 0, y: 6)
             )
+            .accessibilityElement(children: .combine)
     }
 }
 

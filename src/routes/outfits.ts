@@ -3,6 +3,7 @@ import { supabaseAdmin } from '../services/supabase.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { generateJSON, analyzeImageJSON } from '../services/gemini.js';
 import { uploadImage } from '../services/storage.js';
+import { logger } from '../services/logger.js';
 import type { AppVariables, Occasion, Season } from '../types/index.js';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -222,6 +223,13 @@ outfits.post('/daily', async (c) => {
             .eq('user_id', userId);
         }
       }
+    }
+
+    // Refresh the user_rankings materialized view after outfit scoring
+    if (body.score != null) {
+      supabaseAdmin.rpc('refresh_rankings').catch((refreshErr) => {
+        logger.warn({ err: refreshErr }, 'Failed to refresh user_rankings after outfit scoring');
+      });
     }
 
     return c.json({ success: true, data }, 201);

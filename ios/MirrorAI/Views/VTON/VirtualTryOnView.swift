@@ -62,7 +62,7 @@ struct VirtualTryOnView: View {
             }
             .navigationTitle("Virtual Try-On")
             .navigationBarTitleDisplayMode(.inline)
-            .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+            .dynamicTypeSize(...DynamicTypeSize.accessibility5)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -289,7 +289,7 @@ struct VirtualTryOnView: View {
 
                     Text("(1 credit)")
                         .font(.system(size: 13))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(.white.opacity(0.85))
                 }
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)

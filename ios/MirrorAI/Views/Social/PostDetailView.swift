@@ -305,6 +305,8 @@ struct PostDetailView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(comment.user?.username ?? "user") commented: \(comment.content)")
     }
 
     // MARK: - Comment Input Bar

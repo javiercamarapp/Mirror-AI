@@ -53,7 +53,7 @@ struct AuthView: View {
                 }
             }
         }
-        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+        .dynamicTypeSize(...DynamicTypeSize.accessibility5)
         .sheet(isPresented: $showPrivacyPolicy) {
             privacyPolicySheet
         }
@@ -93,7 +93,7 @@ struct AuthView: View {
             Text(L10n.authTagline)
                 .font(.body)
                 .fontWeight(.medium)
-                .foregroundStyle(.white.opacity(0.7))
+                .foregroundStyle(.white.opacity(0.85))
 
             // Feature highlights
             VStack(spacing: 12) {
@@ -137,6 +137,8 @@ struct AuthView: View {
             .signInWithAppleButtonStyle(.white)
             .frame(height: 54)
             .clipShape(RoundedRectangle(cornerRadius: MirrorTheme.buttonRadius))
+            .accessibilityLabel("Sign in with Apple")
+            .accessibilityHint("Signs in using your Apple ID")
 
             // Continue with Google
             Button {
@@ -162,6 +164,8 @@ struct AuthView: View {
                         )
                 )
             }
+            .accessibilityLabel("Continue with Google")
+            .accessibilityHint("Signs in using your Google account")
 
             // Continue with Email (fallback)
             Button {
@@ -187,6 +191,8 @@ struct AuthView: View {
                         )
                 )
             }
+            .accessibilityLabel("Continue with Email")
+            .accessibilityHint("Signs in using a magic link sent to your email")
         }
         .padding(.bottom, 20)
     }
@@ -197,7 +203,7 @@ struct AuthView: View {
         VStack(spacing: 8) {
             Text(L10n.authTermsPrefix)
                 .font(.caption)
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(.white.opacity(0.85))
 
             HStack(spacing: 4) {
                 Button(L10n.authTermsOfService) {
@@ -206,10 +212,12 @@ struct AuthView: View {
                 .font(.caption)
                 .fontWeight(.medium)
                 .foregroundStyle(MirrorTheme.purple)
+                .accessibilityLabel("Terms of Service")
+                .accessibilityHint("Opens the terms of service")
 
                 Text(L10n.authAnd)
                     .font(.caption)
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(.white.opacity(0.85))
 
                 Button(L10n.authPrivacyPolicy) {
                     showPrivacyPolicy = true
@@ -217,6 +225,8 @@ struct AuthView: View {
                 .font(.caption)
                 .fontWeight(.medium)
                 .foregroundStyle(MirrorTheme.purple)
+                .accessibilityLabel("Privacy Policy")
+                .accessibilityHint("Opens the privacy policy")
             }
         }
     }
@@ -418,6 +428,7 @@ struct AuthView: View {
         Text(text)
             .font(.system(size: 16, weight: .bold))
             .padding(.top, 4)
+            .accessibilityAddTraits(.isHeader)
     }
 
     // MARK: - Auth Handlers
@@ -467,6 +478,8 @@ struct AuthView: View {
                         .disableAutocorrection(true)
                         .font(.system(size: 17))
                         .padding(16)
+                        .accessibilityLabel("Email address")
+                        .accessibilityHint("Enter your email address to receive a magic link")
                         .background(
                             RoundedRectangle(cornerRadius: 14)
                                 .fill(Color(UIColor.secondarySystemBackground))
@@ -499,6 +512,8 @@ struct AuthView: View {
                     }
                     .disabled(!emailInput.contains("@") || appState.isLoading)
                     .padding(.horizontal, 24)
+                    .accessibilityLabel("Send Magic Link")
+                    .accessibilityHint("Sends a sign-in link to your email address")
                 }
 
                 Spacer()

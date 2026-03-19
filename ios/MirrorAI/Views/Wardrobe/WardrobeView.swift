@@ -110,7 +110,7 @@ struct WardrobeView: View {
                 }
             }
         }
-        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+        .dynamicTypeSize(...DynamicTypeSize.accessibility5)
     }
 
     // MARK: - Search Bar

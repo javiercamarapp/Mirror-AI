@@ -80,6 +80,7 @@ struct RankingsView: View {
                 Text("Style Leaderboard")
                     .font(.system(size: 22, weight: .bold, design: .rounded))
                     .foregroundStyle(MirrorTheme.gradientPrimary)
+                    .accessibilityAddTraits(.isHeader)
 
                 Text("Top fashionistas this week")
                     .font(.system(size: 14))
@@ -197,6 +198,8 @@ struct RankingsView: View {
                 )
         }
         .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Rank \(rank), \(entry.username ?? entry.fullName ?? "User"), score \(String(format: "%.0f", entry.styleScore ?? 0))\(entry.streakCount.map { $0 > 0 ? ", \($0) day streak" : "" } ?? "")")
     }
 
     // MARK: - Rankings List
@@ -270,6 +273,8 @@ struct RankingsView: View {
                 : AnyShapeStyle(Color.clear)
         )
         .clipShape(RoundedRectangle(cornerRadius: 12))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Rank \(entry.rank), \(entry.fullName ?? entry.username ?? "User"), score \(String(format: "%.0f", entry.styleScore ?? 0))\(entry.streakCount.map { $0 > 0 ? ", \($0) day streak" : "" } ?? "")\(entry.isCurrentUser == true ? ", this is you" : "")")
         .opacity(animateIn ? 1 : 0)
         .offset(x: animateIn ? 0 : 30)
         .animation(.spring(response: 0.5).delay(0.4 + Double(index) * 0.05), value: animateIn)

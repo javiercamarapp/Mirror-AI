@@ -46,11 +46,15 @@ interface RunResponse {
   error?: string;
 }
 
-function headers(): Record<string, string> {
-  return {
+function headers(requestId?: string): Record<string, string> {
+  const hdrs: Record<string, string> = {
     Authorization: `Bearer ${config.fashnApiKey}`,
     'Content-Type': 'application/json',
   };
+  if (requestId) {
+    hdrs['X-Request-Id'] = requestId;
+  }
+  return hdrs;
 }
 
 /**
@@ -58,12 +62,14 @@ function headers(): Record<string, string> {
  * @param modelImage URL of the person / model image.
  * @param garmentImage URL of the garment image.
  * @param category Garment category.
+ * @param requestId Optional correlation ID for tracing across services.
  * @returns The prediction ID.
  */
 export async function startTryOn(
   modelImage: string,
   garmentImage: string,
-  category: GarmentCategory
+  category: GarmentCategory,
+  requestId?: string
 ): Promise<string> {
   try {
     return await fashnBreaker.execute(async () => {
@@ -87,7 +93,7 @@ export async function startTryOn(
       try {
         const response = await fetch(`${BASE_URL}/run`, {
           method: 'POST',
-          headers: headers(),
+          headers: headers(requestId),
           body: JSON.stringify(body),
           signal: controller.signal,
         });
@@ -120,9 +126,11 @@ export async function startTryOn(
 
 /**
  * Check the status of a prediction. Retries up to 2 times on 5xx errors.
+ * @param requestId Optional correlation ID for tracing across services.
  */
 export async function checkStatus(
-  predictionId: string
+  predictionId: string,
+  requestId?: string
 ): Promise<{ status: string; output?: string[]; error?: string }> {
   try {
     return await fashnBreaker.execute(async () => {
@@ -135,7 +143,7 @@ export async function checkStatus(
         try {
           const response = await fetch(`${BASE_URL}/status/${predictionId}`, {
             method: 'GET',
-            headers: headers(),
+            headers: headers(requestId),
             signal: controller.signal,
           });
 
@@ -176,11 +184,13 @@ export async function checkStatus(
  * Poll for a prediction result until completed or timeout.
  * @param predictionId The prediction ID to poll.
  * @param maxWait Maximum wait time in seconds (default 120).
+ * @param requestId Optional correlation ID for tracing across services.
  * @returns The output image URL.
  */
 export async function waitForResult(
   predictionId: string,
-  maxWait = 120
+  maxWait = 120,
+  requestId?: string
 ): Promise<string> {
   const initialInterval = 2000;
   const maxInterval = 15000;
@@ -188,7 +198,7 @@ export async function waitForResult(
   let pollInterval = initialInterval;
 
   while (Date.now() < deadline) {
-    const result = await checkStatus(predictionId);
+    const result = await checkStatus(predictionId, requestId);
 
     if (result.status === 'completed') {
       const url = result.output?.[0];
@@ -211,13 +221,15 @@ export async function waitForResult(
 
 /**
  * Run a complete virtual try-on: start prediction and wait for result.
+ * @param requestId Optional correlation ID for tracing across services.
  * @returns The final output image URL.
  */
 export async function tryOn(
   modelImage: string,
   garmentImage: string,
-  category: GarmentCategory
+  category: GarmentCategory,
+  requestId?: string
 ): Promise<string> {
-  const predictionId = await startTryOn(modelImage, garmentImage, category);
-  return waitForResult(predictionId);
+  const predictionId = await startTryOn(modelImage, garmentImage, category, requestId);
+  return waitForResult(predictionId, 120, requestId);
 }

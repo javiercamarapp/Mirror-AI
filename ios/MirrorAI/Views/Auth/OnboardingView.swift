@@ -71,6 +71,8 @@ struct OnboardingView: View {
                     .animation(reduceMotion ? .none : .spring(response: 0.3), value: currentStep)
             }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Step \(currentStep + 1) of \(totalSteps)")
     }
 
     // MARK: - Step 0: Age Verification
@@ -88,10 +90,11 @@ struct OnboardingView: View {
                 Text("How old are you?")
                     .font(.system(size: 28, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
+                    .accessibilityAddTraits(.isHeader)
 
                 Text("We need to verify your age to continue")
                     .font(.system(size: 16))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(.white.opacity(0.85))
                     .multilineTextAlignment(.center)
             }
 
@@ -115,7 +118,7 @@ struct OnboardingView: View {
 
                     Text("This is required by law (COPPA) to protect children's privacy.")
                         .font(.system(size: 13))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(.white.opacity(0.85))
                         .multilineTextAlignment(.center)
                 }
                 .padding()
@@ -143,7 +146,7 @@ struct OnboardingView: View {
 
                     Text("By continuing, you confirm that a parent or guardian has given consent for you to use Mirror AI.")
                         .font(.system(size: 13))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(.white.opacity(0.85))
                         .multilineTextAlignment(.center)
                 }
                 .padding()
@@ -164,7 +167,7 @@ struct OnboardingView: View {
         }
         .padding(.horizontal)
         .animation(reduceMotion ? .none : .easeInOut(duration: 0.3), value: selectedAgeRange)
-        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+        .dynamicTypeSize(...DynamicTypeSize.accessibility5)
     }
 
     private func ageOptionCard(label: String, value: String) -> some View {
@@ -199,6 +202,9 @@ struct OnboardingView: View {
                     )
             )
         }
+        .accessibilityLabel("Age range: \(label)")
+        .accessibilityValue(selectedAgeRange == value ? "Selected" : "")
+        .accessibilityAddTraits(selectedAgeRange == value ? [.isButton, .isSelected] : .isButton)
     }
 
     // MARK: - Step 1: Welcome
@@ -216,10 +222,11 @@ struct OnboardingView: View {
                 Text("Welcome to Mirror AI")
                     .font(.system(size: 28, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
+                    .accessibilityAddTraits(.isHeader)
 
                 Text("Let's personalize your experience.\nWhat should we call you?")
                     .font(.system(size: 16))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(.white.opacity(0.85))
                     .multilineTextAlignment(.center)
             }
 
@@ -237,6 +244,8 @@ struct OnboardingView: View {
                 )
                 .textInputAutocapitalization(.words)
                 .padding(.horizontal, 16)
+                .accessibilityLabel("Your name")
+                .accessibilityHint("Enter the name you want to be called")
 
             Spacer()
             Spacer()
@@ -254,10 +263,11 @@ struct OnboardingView: View {
                 Text("How do you identify?")
                     .font(.system(size: 28, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
+                    .accessibilityAddTraits(.isHeader)
 
                 Text("This helps us curate better recommendations")
                     .font(.system(size: 16))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(.white.opacity(0.85))
             }
 
             VStack(spacing: 14) {
@@ -293,7 +303,7 @@ struct OnboardingView: View {
 
                     Text(description)
                         .font(.system(size: 13))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(.white.opacity(0.85))
                 }
 
                 Spacer()
@@ -315,6 +325,10 @@ struct OnboardingView: View {
                     )
             )
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(gender), \(description)")
+        .accessibilityValue(selectedGender == gender ? "Selected" : "")
+        .accessibilityAddTraits(selectedGender == gender ? [.isButton, .isSelected] : .isButton)
     }
 
     // MARK: - Step 3: Body
@@ -326,10 +340,11 @@ struct OnboardingView: View {
                     Text("Body Information")
                         .font(.system(size: 28, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
+                        .accessibilityAddTraits(.isHeader)
 
                     Text("Used for accurate try-on and fit recommendations")
                         .font(.system(size: 16))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(.white.opacity(0.85))
                         .multilineTextAlignment(.center)
                 }
                 .padding(.top, 32)
@@ -415,6 +430,10 @@ struct OnboardingView: View {
                     )
             )
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(shape) body shape")
+        .accessibilityValue(selectedBodyShape == shape ? "Selected" : "")
+        .accessibilityAddTraits(selectedBodyShape == shape ? [.isButton, .isSelected] : .isButton)
     }
 
     // MARK: - Step 4: Style Preferences
@@ -426,10 +445,11 @@ struct OnboardingView: View {
                     Text("Your Style DNA")
                         .font(.system(size: 28, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
+                        .accessibilityAddTraits(.isHeader)
 
                     Text("Select all that resonate with you")
                         .font(.system(size: 16))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(.white.opacity(0.85))
                 }
                 .padding(.top, 32)
 
@@ -496,6 +516,10 @@ struct OnboardingView: View {
             )
             .scaleEffect(isSelected ? 1.05 : 1.0)
         }
+        .accessibilityLabel("\(name) style")
+        .accessibilityValue(isSelected ? "Selected" : "")
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+        .accessibilityHint(isSelected ? "Double tap to deselect" : "Double tap to select")
     }
 
     // MARK: - Step 5: Selfie
@@ -508,10 +532,11 @@ struct OnboardingView: View {
                 Text("Color Analysis")
                     .font(.system(size: 28, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
+                    .accessibilityAddTraits(.isHeader)
 
                 Text("Take a selfie to discover your color season\nand get personalized color recommendations")
                     .font(.system(size: 16))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(.white.opacity(0.85))
                     .multilineTextAlignment(.center)
             }
 
@@ -537,6 +562,8 @@ struct OnboardingView: View {
                         .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(MirrorTheme.purple)
                 }
+                .accessibilityLabel("Retake selfie")
+                .accessibilityHint("Opens the camera to take a new selfie")
             } else {
                 Button {
                     showImagePicker = true
@@ -557,12 +584,16 @@ struct OnboardingView: View {
                             .foregroundStyle(.white)
                     }
                 }
+                .accessibilityLabel("Take a selfie")
+                .accessibilityHint("Opens the camera for color analysis")
 
                 Button("Skip for now") {
                     // Allow skipping
                 }
                 .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(.white.opacity(0.85))
+                .accessibilityLabel("Skip selfie")
+                .accessibilityHint("Continues without taking a selfie")
             }
 
             Spacer()
@@ -590,6 +621,8 @@ struct OnboardingView: View {
                                 .fill(Color.white.opacity(0.12))
                         )
                 }
+                .accessibilityLabel("Go back")
+                .accessibilityHint("Returns to the previous step")
             }
 
             Button {
@@ -620,6 +653,8 @@ struct OnboardingView: View {
                 )
             }
             .disabled(!canProceed)
+            .accessibilityLabel(currentStep == totalSteps - 1 ? "Get Started" : "Next step")
+            .accessibilityHint(currentStep == totalSteps - 1 ? "Completes onboarding and starts the app" : "Moves to the next step")
         }
     }
 

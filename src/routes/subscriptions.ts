@@ -5,6 +5,7 @@ import { logger } from '../services/logger.js';
 import type { AppVariables } from '../types/index.js';
 import { v4 as uuidv4 } from 'uuid';
 import { verifyTransaction, verifySignedPayload } from '../services/appstore.js';
+import { PLAN_LIMITS, CREDITS_BY_PLAN, PRODUCT_TO_PLAN, invalidateSubscriptionCache } from '../services/subscriptionService.js';
 
 const subscriptions = new Hono<{ Variables: AppVariables }>();
 
@@ -45,6 +46,70 @@ subscriptions.post('/webhooks/appstore', async (c) => {
     }
 
     switch (notificationType) {
+      case 'SUBSCRIBED': {
+        // Initial subscription purchase via webhook (e.g. family sharing or promo)
+        if (!transactionData?.originalTransactionId) break;
+
+        // Idempotency check
+        if (transactionData.transactionId) {
+          const { data: existingTxn } = await supabaseAdmin
+            .from('subscription_history')
+            .select('id')
+            .eq('transaction_id', transactionData.transactionId)
+            .maybeSingle();
+
+          if (existingTxn) {
+            logger.info({ transactionId: transactionData.transactionId }, 'SUBSCRIBED already processed, skipping');
+            break;
+          }
+        }
+
+        // Determine plan from product ID
+        const productId = transactionData.productId;
+        const plan = productId ? (PRODUCT_TO_PLAN[productId] ?? 'basic') : 'basic';
+        const newExpiry = transactionData.expiresDate ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+        // We need to find the user by original transaction — look up any existing record
+        const { data: existingSub } = await supabaseAdmin
+          .from('subscription_history')
+          .select('user_id')
+          .eq('transaction_id', transactionData.originalTransactionId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (existingSub) {
+          const { error: insertError } = await supabaseAdmin.from('subscription_history').insert({
+            id: uuidv4(),
+            user_id: existingSub.user_id,
+            product_id: productId ?? null,
+            plan,
+            status: 'active',
+            transaction_id: transactionData.transactionId,
+            platform: 'ios',
+            expires_at: newExpiry,
+            auto_renew_status: true,
+          });
+
+          if (!insertError) {
+            const credits = CREDITS_BY_PLAN[plan] ?? 3;
+            await supabaseAdmin.rpc('increment_credits_atomic', {
+              p_user_id: existingSub.user_id,
+              p_amount: credits,
+              p_request_id: transactionData.transactionId ?? uuidv4(),
+            });
+
+            await supabaseAdmin
+              .from('user_profiles')
+              .update({ subscription_plan: plan })
+              .eq('id', existingSub.user_id);
+
+            invalidateSubscriptionCache(existingSub.user_id);
+          }
+        }
+        break;
+      }
+
       case 'DID_RENEW': {
         if (!transactionData?.originalTransactionId) break;
 
@@ -84,6 +149,7 @@ subscriptions.post('/webhooks/appstore', async (c) => {
             transaction_id: transactionData.transactionId,
             platform: 'ios',
             expires_at: newExpiry,
+            auto_renew_status: true,
           });
 
           if (insertError) {
@@ -91,27 +157,80 @@ subscriptions.post('/webhooks/appstore', async (c) => {
             break;
           }
 
-          // Reset credits atomically
-          const plan = sub.plan ?? 'free';
-          const credits = CREDITS_BY_PLAN[plan] ?? 3;
-          try {
-            await supabaseAdmin.rpc('increment_credits_atomic', {
-              p_user_id: sub.user_id,
-              p_amount: credits,
-              p_request_id: transactionData.transactionId ?? null,
-            });
-          } catch (creditErr) {
-            logger.error({ err: creditErr }, 'DID_RENEW: Failed to increment credits, falling back to direct update');
-            await supabaseAdmin
-              .from('user_profiles')
-              .update({ subscription_plan: plan, vton_credits: credits })
-              .eq('id', sub.user_id);
-          }
+          // Reset credits atomically — no fallback to direct update
+          const renewPlan = sub.plan ?? 'free';
+          const credits = CREDITS_BY_PLAN[renewPlan] ?? 3;
+          await supabaseAdmin.rpc('increment_credits_atomic', {
+            p_user_id: sub.user_id,
+            p_amount: credits,
+            p_request_id: transactionData.transactionId ?? uuidv4(),
+          });
 
           await supabaseAdmin
             .from('user_profiles')
-            .update({ subscription_plan: plan })
+            .update({ subscription_plan: renewPlan })
             .eq('id', sub.user_id);
+
+          invalidateSubscriptionCache(sub.user_id);
+        }
+        break;
+      }
+
+      case 'DID_CHANGE_RENEWAL_PREF': {
+        // User changed their auto-renewal preference (product change)
+        if (!transactionData?.originalTransactionId) break;
+
+        const { data: sub } = await supabaseAdmin
+          .from('subscription_history')
+          .select('*')
+          .eq('transaction_id', transactionData.originalTransactionId)
+          .in('status', ['active', 'billing_retry'])
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (sub) {
+          // The auto-renewal product may have changed; log it
+          logger.info({
+            userId: sub.user_id,
+            originalTransactionId: transactionData.originalTransactionId,
+            autoRenewProductId: transactionData.autoRenewProductId,
+          }, 'DID_CHANGE_RENEWAL_PREF received');
+
+          await supabaseAdmin
+            .from('subscription_history')
+            .update({
+              auto_renew_status: transactionData.autoRenewStatus ?? true,
+            })
+            .eq('id', sub.id);
+        }
+        break;
+      }
+
+      case 'DID_CHANGE_RENEWAL_STATUS': {
+        // User enabled/disabled auto-renewal
+        if (!transactionData?.originalTransactionId) break;
+
+        const { data: sub } = await supabaseAdmin
+          .from('subscription_history')
+          .select('*')
+          .eq('transaction_id', transactionData.originalTransactionId)
+          .in('status', ['active', 'billing_retry'])
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (sub) {
+          const autoRenew = transactionData.autoRenewStatus ?? false;
+          logger.info({
+            userId: sub.user_id,
+            autoRenew,
+          }, 'DID_CHANGE_RENEWAL_STATUS received');
+
+          await supabaseAdmin
+            .from('subscription_history')
+            .update({ auto_renew_status: autoRenew })
+            .eq('id', sub.id);
         }
         break;
       }
@@ -137,6 +256,36 @@ subscriptions.post('/webhooks/appstore', async (c) => {
         break;
       }
 
+      case 'GRACE_PERIOD_EXPIRED': {
+        // Billing grace period has expired — downgrade the user
+        if (!transactionData?.originalTransactionId) break;
+
+        const { data: sub } = await supabaseAdmin
+          .from('subscription_history')
+          .select('*')
+          .eq('transaction_id', transactionData.originalTransactionId)
+          .in('status', ['active', 'billing_retry'])
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (sub) {
+          await supabaseAdmin
+            .from('subscription_history')
+            .update({ status: 'expired', grace_period_expires_at: new Date().toISOString() })
+            .eq('id', sub.id);
+
+          // Downgrade user to free
+          await supabaseAdmin
+            .from('user_profiles')
+            .update({ subscription_plan: 'free', vton_credits: CREDITS_BY_PLAN['free'] ?? 3 })
+            .eq('id', sub.user_id);
+
+          invalidateSubscriptionCache(sub.user_id);
+        }
+        break;
+      }
+
       case 'EXPIRED': {
         if (!transactionData?.originalTransactionId) break;
 
@@ -158,8 +307,10 @@ subscriptions.post('/webhooks/appstore', async (c) => {
           // Downgrade user to free
           await supabaseAdmin
             .from('user_profiles')
-            .update({ subscription_plan: 'free', vton_credits: 3 })
+            .update({ subscription_plan: 'free', vton_credits: CREDITS_BY_PLAN['free'] ?? 3 })
             .eq('id', sub.user_id);
+
+          invalidateSubscriptionCache(sub.user_id);
         }
         break;
       }
@@ -184,14 +335,16 @@ subscriptions.post('/webhooks/appstore', async (c) => {
           // Downgrade user to free
           await supabaseAdmin
             .from('user_profiles')
-            .update({ subscription_plan: 'free', vton_credits: 3 })
+            .update({ subscription_plan: 'free', vton_credits: CREDITS_BY_PLAN['free'] ?? 3 })
             .eq('id', sub.user_id);
+
+          invalidateSubscriptionCache(sub.user_id);
         }
         break;
       }
 
       default:
-        // Unknown notification type — acknowledge receipt
+        logger.info({ notificationType }, 'App Store Webhook: unhandled notification type');
         break;
     }
 
@@ -206,25 +359,7 @@ subscriptions.post('/webhooks/appstore', async (c) => {
 // All remaining subscription routes require authentication
 subscriptions.use('*', authMiddleware);
 
-// Plan limits
-const PLAN_LIMITS: Record<string, { wardrobe_limit: number; vton_credits_monthly: number; ai_chats_daily: number }> = {
-  free: { wardrobe_limit: 50, vton_credits_monthly: 3, ai_chats_daily: 10 },
-  basic: { wardrobe_limit: 200, vton_credits_monthly: 15, ai_chats_daily: 50 },
-  premium: { wardrobe_limit: -1, vton_credits_monthly: 50, ai_chats_daily: -1 },
-};
-
-// Product ID to plan mapping
-const PRODUCT_TO_PLAN: Record<string, string> = {
-  'com.mirrorai.pro.monthly': 'basic',
-  'com.mirrorai.premium.monthly': 'premium',
-};
-
-// Credits by plan
-const CREDITS_BY_PLAN: Record<string, number> = {
-  free: 3,
-  basic: 15,
-  premium: 50,
-};
+// Plan limits, credits, and product mapping imported from subscriptionService (single source of truth)
 
 // ─── POST /subscriptions/verify ───────────────────────────────────────────────
 // Verify receipt and activate subscription.
@@ -504,33 +639,20 @@ subscriptions.post('/purchases/credits', async (c) => {
       return c.json({ success: false, error: 'Failed to record purchase' }, 500);
     }
 
-    // Add credits atomically using RPC
-    let updatedCredits: number;
-    try {
-      const { data: newCredits, error: creditError } = await supabaseAdmin
-        .rpc('increment_credits_atomic', {
-          p_user_id: userId,
-          p_amount: pack.credits ?? 0,
-          p_request_id: body.transaction_id,
-        });
+    // Add credits atomically using RPC — no fallback to preserve atomicity
+    const { data: newCredits, error: creditError } = await supabaseAdmin
+      .rpc('increment_credits_atomic', {
+        p_user_id: userId,
+        p_amount: pack.credits ?? 0,
+        p_request_id: body.transaction_id,
+      });
 
-      if (creditError) throw creditError;
-      updatedCredits = newCredits;
-    } catch (creditErr) {
-      logger.error({ err: creditErr }, 'Atomic credit increment failed, falling back');
-      // Fallback: read-then-write (less safe but better than failing)
-      const { data: profile } = await supabaseAdmin
-        .from('user_profiles')
-        .select('vton_credits')
-        .eq('id', userId)
-        .single();
-
-      updatedCredits = (profile?.vton_credits ?? 0) + (pack.credits ?? 0);
-      await supabaseAdmin
-        .from('user_profiles')
-        .update({ vton_credits: updatedCredits })
-        .eq('id', userId);
+    if (creditError) {
+      logger.error({ err: creditError }, 'Atomic credit increment failed');
+      return c.json({ success: false, error: 'Failed to add credits' }, 500);
     }
+    const updatedCredits: number = newCredits;
+    invalidateSubscriptionCache(userId);
 
     return c.json({
       success: true,

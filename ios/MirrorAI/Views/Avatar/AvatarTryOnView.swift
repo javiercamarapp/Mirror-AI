@@ -132,6 +132,8 @@ struct AvatarTryOnView: View {
                                     .frame(width: 36, height: 36)
                                     .background(Circle().fill(.ultraThinMaterial))
                             }
+                            .accessibilityLabel(savedToPhotos ? "Saved to photos" : "Save to photos")
+                            .accessibilityHint("Saves the rendered image to your photo library")
 
                             Button {
                                 shareRenderedImage()
@@ -142,6 +144,8 @@ struct AvatarTryOnView: View {
                                     .frame(width: 36, height: 36)
                                     .background(Circle().fill(.ultraThinMaterial))
                             }
+                            .accessibilityLabel("Share rendered image")
+                            .accessibilityHint("Opens sharing options for the rendered image")
                         }
                         .padding(10)
                     }
@@ -189,6 +193,9 @@ struct AvatarTryOnView: View {
                                           : AnyShapeStyle(MirrorTheme.surfaceColor))
                             )
                     }
+                    .accessibilityLabel("\(category) category")
+                    .accessibilityValue(selectedCategory == category ? "Selected" : "")
+                    .accessibilityAddTraits(selectedCategory == category ? [.isButton, .isSelected] : .isButton)
                 }
             }
             .padding(.horizontal, 20)
@@ -286,6 +293,11 @@ struct AvatarTryOnView: View {
             }
             .scaleEffect(isSelected ? 0.93 : 1.0)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(item.name), \(item.category)")
+        .accessibilityValue(isSelected ? "Selected" : "")
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+        .accessibilityHint(isSelected ? "Double tap to deselect" : "Double tap to select for try-on")
     }
 
     // MARK: - Bottom Bar
@@ -306,7 +318,7 @@ struct AvatarTryOnView: View {
                     if !selectedItems.isEmpty {
                         Text("(\(selectedItems.count))")
                             .font(.system(size: 14))
-                            .foregroundStyle(.white.opacity(0.7))
+                            .foregroundStyle(.white.opacity(0.85))
                     }
                 }
                 .foregroundStyle(.white)
@@ -322,6 +334,9 @@ struct AvatarTryOnView: View {
             .disabled(selectedItems.isEmpty)
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
+            .accessibilityLabel(renderResult != nil ? "Re-render outfit" : "Render outfit")
+            .accessibilityHint("Renders the selected items on your avatar")
+            .accessibilityValue("\(selectedItems.count) items selected")
         }
         .background(.ultraThinMaterial)
     }

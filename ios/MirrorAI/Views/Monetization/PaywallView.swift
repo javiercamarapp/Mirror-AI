@@ -63,6 +63,7 @@ struct PaywallView: View {
                 VStack(spacing: 8) {
                     Text("Premium Feature")
                         .font(.system(size: 24, weight: .bold))
+                        .accessibilityAddTraits(.isHeader)
 
                     Text("Unlock the full potential of Mirror AI")
                         .font(.system(size: 15))
@@ -78,10 +79,12 @@ struct PaywallView: View {
                                 .font(.system(size: 17))
                                 .foregroundStyle(MirrorTheme.gradientPrimary)
                                 .frame(width: 24)
+                                .accessibilityHidden(true)
 
                             Text(text)
                                 .font(.system(size: 15, weight: .medium))
                         }
+                        .accessibilityElement(children: .combine)
                     }
                 }
                 .padding(.horizontal, 8)
@@ -107,6 +110,8 @@ struct PaywallView: View {
                             .shadow(color: MirrorTheme.purple.opacity(0.4), radius: 12, y: 4)
                     )
                 }
+                .accessibilityLabel("Upgrade Now")
+                .accessibilityHint("Opens subscription plans to unlock premium features")
 
                 // Pricing hint
                 HStack(spacing: 4) {
@@ -127,6 +132,8 @@ struct PaywallView: View {
                         .foregroundStyle(.secondary)
                         .padding(.vertical, 8)
                 }
+                .accessibilityLabel("Maybe Later")
+                .accessibilityHint("Closes the upgrade prompt")
 
                 Spacer().frame(height: 8)
             }

@@ -15,8 +15,10 @@ const mockSupabase = {
   from: vi.fn(),
   storage: {
     from: vi.fn(() => ({
+      upload: vi.fn().mockResolvedValue({ data: { path: 'test/path.jpg' }, error: null }),
       list: vi.fn().mockResolvedValue({ data: [], error: null }),
       remove: vi.fn().mockResolvedValue({ error: null }),
+      getPublicUrl: vi.fn().mockReturnValue({ data: { publicUrl: 'https://storage.example.com/image.png' } }),
     })),
   },
 };
@@ -48,7 +50,21 @@ vi.mock('../../services/storage.js', () => ({
 }));
 
 vi.mock('uuid', () => ({
-  v4: vi.fn(() => 'test-uuid-1234'),
+  v4: () => 'test-uuid-1234',
+}));
+
+// Mock sharp to prevent "unsupported image format" errors from transitive imports
+const sharpChain: any = new Proxy({}, {
+  get: (_target, prop) => {
+    if (prop === 'toBuffer') return vi.fn().mockResolvedValue(Buffer.from('processed'));
+    if (prop === 'toFile') return vi.fn().mockResolvedValue({ width: 100, height: 100 });
+    if (prop === 'then') return undefined;
+    return vi.fn(() => sharpChain);
+  },
+});
+vi.mock('sharp', () => ({
+  default: vi.fn(() => sharpChain),
+  __esModule: true,
 }));
 
 // Helper to build chainable query mock
@@ -65,7 +81,6 @@ function chainMock(returnValue: { data: any; error: any; count?: number }) {
 }
 
 // ─── Import route after mocks ──────────────────────────────────────────────
-const { uploadImage: importedUploadImage } = await import('../../services/storage.js');
 const { userRoutes } = await import('../../routes/user.js');
 
 const app = new Hono<{ Variables: AppVariables }>();
@@ -84,12 +99,6 @@ const AUTH_HEADER = { 'X-Test-User-Id': 'user-1' };
 describe('User Routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  it('debug: uploadImage mock should work', async () => {
-    const result = await importedUploadImage('avatars' as any, 'test/path.jpg', Buffer.from('test'), 'image/jpeg');
-    console.log('DEBUG direct call result:', result);
-    expect(result).toBe('https://storage.example.com/image.png');
   });
 
   // ── GET /user/profile ─────────────────────────────────────────────────

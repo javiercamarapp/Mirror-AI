@@ -61,6 +61,8 @@ struct AvatarCustomizerView: View {
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(MirrorTheme.purple)
                     }
+                    .accessibilityLabel(showBeforeAfter ? "Show after preview" : "Show before preview")
+                    .accessibilityHint("Toggles between before and after views")
                 }
             }
         }
@@ -148,6 +150,9 @@ struct AvatarCustomizerView: View {
                     }
                     .frame(maxWidth: .infinity)
                 }
+                .accessibilityLabel("\(tab) options")
+                .accessibilityValue(activeTab == index ? "Selected" : "")
+                .accessibilityAddTraits(activeTab == index ? [.isButton, .isSelected] : .isButton)
             }
         }
         .padding(.horizontal, 20)
@@ -214,6 +219,9 @@ struct AvatarCustomizerView: View {
                     }
                 }
                 .scaleEffect(isSelected ? 1.02 : 1.0)
+                .accessibilityLabel("\(style.name) style")
+                .accessibilityValue(isSelected ? "Selected" : "")
+                .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
             }
         }
         .padding(.horizontal, 20)
@@ -250,6 +258,9 @@ struct AvatarCustomizerView: View {
                                 )
                         )
                 }
+                .accessibilityLabel(option)
+                .accessibilityValue(isSelected ? "Selected" : "")
+                .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
             }
         }
         .padding(.horizontal, 20)
@@ -284,6 +295,8 @@ struct AvatarCustomizerView: View {
         .disabled(isSaving)
         .padding(.horizontal, 20)
         .padding(.bottom, 20)
+        .accessibilityLabel(isSaving ? "Saving customization" : "Save customization")
+        .accessibilityHint("Saves your avatar customization choices")
     }
 
     // MARK: - Save

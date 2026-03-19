@@ -35,7 +35,7 @@ struct DailyOutfitView: View {
             .background(Color(UIColor.systemBackground))
             .navigationTitle("Daily Outfit")
             .navigationBarTitleDisplayMode(.inline)
-            .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+            .dynamicTypeSize(...DynamicTypeSize.accessibility5)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Close") { dismiss() }
@@ -71,6 +71,9 @@ struct DailyOutfitView: View {
                                     )
                             )
                     }
+                    .accessibilityLabel("\(occasion) occasion")
+                    .accessibilityValue(selectedOccasion == occasion ? "Selected" : "")
+                    .accessibilityAddTraits(selectedOccasion == occasion ? [.isButton, .isSelected] : .isButton)
                 }
             }
             .padding(.vertical, 4)
@@ -116,6 +119,8 @@ struct DailyOutfitView: View {
                         .fill(MirrorTheme.gradientPrimary)
                 )
             }
+            .accessibilityLabel("Generate Outfit")
+            .accessibilityHint("AI will create a \(selectedOccasion) outfit from your wardrobe")
         }
     }
 
@@ -228,6 +233,8 @@ struct DailyOutfitView: View {
                     )
                 }
                 .disabled(isSaving)
+                .accessibilityLabel(isSaving ? "Saving outfit" : "Save as today's outfit")
+                .accessibilityHint("Saves this outfit as your outfit of the day")
 
                 HStack(spacing: 12) {
                     Button {
@@ -246,6 +253,8 @@ struct DailyOutfitView: View {
                                 .fill(MirrorTheme.purple.opacity(0.12))
                         )
                     }
+                    .accessibilityLabel("Generate new outfit")
+                    .accessibilityHint("Creates a different outfit suggestion")
 
                     Button {
                         // Navigate to VTON
@@ -263,6 +272,8 @@ struct DailyOutfitView: View {
                                 .fill(MirrorTheme.pink.opacity(0.12))
                         )
                     }
+                    .accessibilityLabel("Try it on")
+                    .accessibilityHint("Opens virtual try-on for this outfit")
 
                     Button {
                         showShareSheet = true
@@ -280,6 +291,8 @@ struct DailyOutfitView: View {
                                 .fill(MirrorTheme.indigo.opacity(0.12))
                         )
                     }
+                    .accessibilityLabel("Share outfit")
+                    .accessibilityHint("Opens sharing options for this outfit")
                 }
             }
         }
@@ -311,6 +324,8 @@ struct DailyOutfitView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(item.name), \(item.category)")
     }
 
     // MARK: - Actions

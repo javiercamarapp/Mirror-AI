@@ -130,6 +130,8 @@ struct OutfitResultView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Style score \(String(format: "%.1f", outfit.score)) out of 10")
     }
 
     // MARK: - Items Grid
@@ -207,6 +209,8 @@ struct OutfitResultView: View {
             }
         }
         .frame(width: 130)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(item.name), \(item.category), \(item.color)")
         .opacity(animateIn ? 1 : 0)
         .offset(y: animateIn ? 0 : 20)
         .animation(.spring(response: 0.5).delay(0.3 + Double(index) * 0.1), value: animateIn)
@@ -321,6 +325,8 @@ struct OutfitResultView: View {
                     )
                 }
                 .disabled(isTryingOn)
+                .accessibilityLabel(isTryingOn ? "Trying on outfit" : "Try on outfit")
+                .accessibilityHint("Virtually try on this outfit using your photo")
 
                 // Save
                 Button {
@@ -351,6 +357,8 @@ struct OutfitResultView: View {
                     )
                 }
                 .disabled(isSaving)
+                .accessibilityLabel(isSaving ? "Saving outfit" : "Save outfit")
+                .accessibilityHint("Saves this outfit to your collection")
             }
 
             // Share button
@@ -377,6 +385,8 @@ struct OutfitResultView: View {
                         )
                 )
             }
+            .accessibilityLabel("Share to feed")
+            .accessibilityHint("Opens the post creator to share this outfit")
         }
     }
 

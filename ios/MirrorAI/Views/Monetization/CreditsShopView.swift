@@ -142,6 +142,8 @@ struct CreditsShopView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(appState.vtonCredits) credits available. Use credits for virtual try-on sessions.")
     }
 
     // MARK: - Credit Pack Card
@@ -244,6 +246,10 @@ struct CreditsShopView: View {
             }
         }
         .disabled(isPurchasing)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(pack.credits) credits for \(localizedPrice(for: pack)), \(pack.fallbackPricePerCredit) per credit\(pack.isBestValue ? ", best value" : "")")
+        .accessibilityHint("Double tap to purchase this credit pack")
+        .accessibilityAddTraits(.isButton)
     }
 
     // MARK: - Info Text
@@ -254,19 +260,23 @@ struct CreditsShopView: View {
                 Image(systemName: "info.circle.fill")
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
                 Text("Credits never expire")
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
             }
+            .accessibilityElement(children: .combine)
 
             HStack(spacing: 6) {
                 Image(systemName: "arrow.triangle.2.circlepath")
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
                 Text("Pro & Premium plans include monthly credits")
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
             }
+            .accessibilityElement(children: .combine)
         }
     }
 

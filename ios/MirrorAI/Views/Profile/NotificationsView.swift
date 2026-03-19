@@ -62,6 +62,8 @@ struct NotificationsView: View {
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundStyle(MirrorTheme.purple)
                         }
+                        .accessibilityLabel("Mark all as read")
+                        .accessibilityHint("Marks all notifications as read")
                     }
                 }
 
@@ -85,6 +87,7 @@ struct NotificationsView: View {
             Text(title)
                 .font(.system(size: 16, weight: .bold))
                 .foregroundStyle(.secondary)
+                .accessibilityAddTraits(.isHeader)
 
             ForEach(Array(notifications.enumerated()), id: \.element.id) { index, notification in
                 notificationRow(notification)
@@ -162,6 +165,10 @@ struct NotificationsView: View {
                     )
             )
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(notification.title)\(notification.body.map { ". \($0)" } ?? ""). \(timeAgo(from: notification.createdAt))")
+        .accessibilityValue(notification.read ? "Read" : "Unread")
+        .accessibilityHint(notification.read ? "" : "Double tap to mark as read")
     }
 
     // MARK: - Helpers

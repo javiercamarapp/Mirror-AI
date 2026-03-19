@@ -8,7 +8,7 @@ primary_region = "iad"
   force_https = true
   auto_stop_machines = true
   auto_start_machines = true
-  min_machines_running = 1
+  min_machines_running = 2
 
 [env]
   NODE_ENV = "production"
@@ -17,4 +17,9 @@ primary_region = "iad"
 [[vm]]
   cpu_kind = "shared"
   cpus = 1
-  memory_mb = 512
+  memory_mb = 1024
+
+# Deploy to secondary region for failover (use: fly scale count 1 --region ord)
+# Regions: iad (primary), ord (failover)
+# With min_machines_running = 2 and auto_start_machines = true,
+# Fly will maintain HA across available regions.

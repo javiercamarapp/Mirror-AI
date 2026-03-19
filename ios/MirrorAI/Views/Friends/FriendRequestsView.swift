@@ -120,6 +120,8 @@ struct FriendRequestsView: View {
                                     )
                             )
                     }
+                    .accessibilityLabel("Reject request from \(request.requester?.fullName ?? "unknown")")
+                    .accessibilityHint("Declines this friend request")
 
                     Button {
                         Task {
@@ -137,9 +139,12 @@ struct FriendRequestsView: View {
                                     .fill(MirrorTheme.gradientPrimary)
                             )
                     }
+                    .accessibilityLabel("Accept request from \(request.requester?.fullName ?? "unknown")")
+                    .accessibilityHint("Accepts this friend request")
                 }
             }
         }
+        .accessibilityElement(children: .contain)
     }
 
     // MARK: - Helpers

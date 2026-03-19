@@ -117,6 +117,8 @@ struct PostCreatorView: View {
                     .shadow(color: .black.opacity(0.5), radius: 4)
             }
             .padding(12)
+            .accessibilityLabel("Remove selected photo")
+            .accessibilityHint("Removes the current photo selection")
         }
         .transition(.scale.combined(with: .opacity))
     }
@@ -155,6 +157,8 @@ struct PostCreatorView: View {
                 )
             }
             .padding(12)
+            .accessibilityLabel("Change photo")
+            .accessibilityHint("Opens photo source selection")
         }
     }
 
@@ -197,6 +201,8 @@ struct PostCreatorView: View {
                     )
             )
         }
+        .accessibilityLabel("Add photo")
+        .accessibilityHint("Opens photo source selection to choose a photo for your post")
     }
 
     // MARK: - Caption Section
@@ -218,6 +224,8 @@ struct PostCreatorView: View {
             TextField("Write a caption...", text: $caption, axis: .vertical)
                 .font(.system(size: 15))
                 .lineLimit(5)
+                .accessibilityLabel("Post caption")
+                .accessibilityHint("Write a caption for your post")
                 .padding(14)
                 .background(
                     RoundedRectangle(cornerRadius: 14)
@@ -284,6 +292,9 @@ struct PostCreatorView: View {
                                         )
                                 )
                         }
+                        .accessibilityLabel("\(tag) occasion")
+                        .accessibilityValue(occasionTag == tag ? "Selected" : "")
+                        .accessibilityAddTraits(occasionTag == tag ? [.isButton, .isSelected] : .isButton)
                     }
                 }
             }
@@ -323,6 +334,8 @@ struct PostCreatorView: View {
                 )
             }
             .disabled(!hasContent || isPostingAsPost)
+            .accessibilityLabel("Post to Feed")
+            .accessibilityHint("Publishes your photo to the social feed")
 
             // Share as Story
             Button {
@@ -348,6 +361,8 @@ struct PostCreatorView: View {
                 )
             }
             .disabled(!hasContent || isPostingAsStory)
+            .accessibilityLabel("Share as Story")
+            .accessibilityHint("Shares your photo as a temporary story")
         }
     }
 

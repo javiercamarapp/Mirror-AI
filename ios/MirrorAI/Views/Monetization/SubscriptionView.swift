@@ -162,6 +162,7 @@ struct SubscriptionView: View {
 
             Text("Choose Your Plan")
                 .font(.system(size: 26, weight: .bold))
+                .accessibilityAddTraits(.isHeader)
 
             Text("Unlock the full Mirror AI experience")
                 .font(.system(size: 15))
@@ -350,16 +351,21 @@ struct SubscriptionView: View {
                 }
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(MirrorTheme.purple)
+                .accessibilityLabel("Terms of Service")
+                .accessibilityHint("Opens the terms of service")
 
                 Text("|")
                     .font(.system(size: 12))
                     .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
 
                 Button("Privacy Policy") {
                     showSubscriptionPrivacyPolicy = true
                 }
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(MirrorTheme.purple)
+                .accessibilityLabel("Privacy Policy")
+                .accessibilityHint("Opens the privacy policy")
             }
         }
         .padding(.horizontal, 16)

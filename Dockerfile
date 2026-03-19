@@ -1,3 +1,5 @@
+# .dockerignore includes: node_modules, .git, .env, .env.local, *.md, .github, ios, supabase, scripts
+
 # ─── Stage 1: Builder ─────────────────────────────────────────────────────────
 FROM node:20-slim AS builder
 
@@ -22,9 +24,9 @@ FROM node:20-slim AS runtime
 
 WORKDIR /app
 
-# Install runtime system dependencies for sharp
+# Install runtime system dependencies for sharp (libvips only, no -dev headers)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libvips-dev \
+    libvips42 \
     curl \
     && rm -rf /var/lib/apt/lists/*
 

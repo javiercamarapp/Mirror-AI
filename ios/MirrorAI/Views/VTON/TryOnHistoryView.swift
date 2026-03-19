@@ -29,6 +29,10 @@ struct TryOnHistoryView: View {
                         LazyVGrid(columns: columns, spacing: 12) {
                             ForEach(Array(appState.vtonHistory.enumerated()), id: \.element.id) { index, result in
                                 historyCard(result)
+                                    .accessibilityElement(children: .combine)
+                                    .accessibilityLabel("Try-on result from \(formatDate(result.createdAt)), \(result.creditsUsed) credit\(result.creditsUsed == 1 ? "" : "s") used")
+                                    .accessibilityHint("Double tap to view full screen")
+                                    .accessibilityAddTraits([.isButton, .isImage])
                                     .opacity(appearAnimation ? 1 : 0)
                                     .scaleEffect(appearAnimation ? 1 : 0.9)
                                     .animation(
@@ -159,6 +163,8 @@ struct TryOnHistoryView: View {
                             .background(Circle().fill(.black.opacity(0.3)))
                     }
                     .padding(20)
+                    .accessibilityLabel("Close full screen view")
+                    .accessibilityHint("Returns to the history grid")
                 }
                 Spacer()
             }
@@ -173,7 +179,7 @@ struct TryOnHistoryView: View {
                             .font(.system(size: 14, weight: .medium))
                         Text("\(result.creditsUsed) credit\(result.creditsUsed == 1 ? "" : "s") used")
                             .font(.system(size: 12))
-                            .foregroundStyle(.white.opacity(0.7))
+                            .foregroundStyle(.white.opacity(0.85))
                     }
 
                     Spacer()
@@ -187,6 +193,8 @@ struct TryOnHistoryView: View {
                             .frame(width: 44, height: 44)
                             .background(Circle().fill(.ultraThinMaterial))
                     }
+                    .accessibilityLabel("Save to photos")
+                    .accessibilityHint("Saves this try-on result to your photo library")
                 }
                 .foregroundStyle(.white)
                 .padding(20)

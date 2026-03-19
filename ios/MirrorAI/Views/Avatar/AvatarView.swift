@@ -57,7 +57,7 @@ struct AvatarView: View {
             }
             .navigationTitle("My Avatar")
             .navigationBarTitleDisplayMode(.large)
-            .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+            .dynamicTypeSize(...DynamicTypeSize.accessibility5)
             .sheet(isPresented: $showCustomizer) {
                 AvatarCustomizerView()
             }
@@ -137,6 +137,9 @@ struct AvatarView: View {
             }
             .frame(width: 280, height: 340)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Avatar preview, \(styles.first(where: { $0.id == selectedStyle })?.name ?? "Realistic") style")
+        .accessibilityAddTraits(.isImage)
     }
 
     private var avatarPlaceholder: some View {
@@ -157,6 +160,7 @@ struct AvatarView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Avatar Style")
                 .font(.system(size: 16, weight: .bold))
+                .accessibilityAddTraits(.isHeader)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
@@ -190,6 +194,9 @@ struct AvatarView: View {
                         }
                     }
                 }
+                .accessibilityLabel("\(style.name) style")
+                .accessibilityValue(isSelected ? "Selected" : "")
+                .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
             }
         }
     }
@@ -221,6 +228,8 @@ struct AvatarView: View {
                         .fill(MirrorTheme.gradientPrimary)
                 )
             }
+            .accessibilityLabel("Generate Avatar")
+            .accessibilityHint(isPremium ? "Creates an AI-generated avatar" : "Opens upgrade screen")
 
             HStack(spacing: 12) {
                 Button {
@@ -250,6 +259,8 @@ struct AvatarView: View {
                             )
                     )
                 }
+                .accessibilityLabel("Customize avatar")
+                .accessibilityHint(isPremium ? "Opens avatar customization options" : "Opens upgrade screen")
 
                 Button {
                     let impact = UIImpactFeedbackGenerator(style: .light)
@@ -278,6 +289,8 @@ struct AvatarView: View {
                             )
                     )
                 }
+                .accessibilityLabel("Try outfit on avatar")
+                .accessibilityHint(isPremium ? "Opens wardrobe to try outfits on your avatar" : "Opens upgrade screen")
             }
         }
     }
@@ -333,8 +346,12 @@ struct AvatarView: View {
                     )
                 }
                 .padding(.horizontal, 40)
+                .accessibilityLabel("Upgrade Now")
+                .accessibilityHint("Opens subscription options to unlock premium features")
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Premium feature locked. Upgrade to create and customize your personal AI avatar.")
     }
 
     // MARK: - Generate Avatar

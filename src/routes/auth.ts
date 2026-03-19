@@ -1,12 +1,74 @@
 import { Hono } from 'hono';
 import { supabaseAdmin } from '../services/supabase.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { getRedisClient } from '../services/redis.js';
+import { logger } from '../services/logger.js';
 import type { AppVariables } from '../types/index.js';
 
 const auth = new Hono<{ Variables: AppVariables }>();
 
 // Rate limiting for /auth/ routes is handled by the global rate limiter middleware
 // in index.ts (10 requests per 15 minutes for /api/auth/ paths).
+
+// ─── Token format validation ─────────────────────────────────────────────────
+function isValidJWTFormat(token: string): boolean {
+  // JWTs have 3 base64url-encoded segments separated by dots
+  const parts = token.split('.');
+  if (parts.length !== 3) return false;
+  // Each part should be valid base64url (alphanumeric, -, _, =)
+  const base64urlRegex = /^[A-Za-z0-9_-]+=*$/;
+  return parts.every((part) => part.length > 0 && base64urlRegex.test(part));
+}
+
+// ─── Dedicated rate limit for token refresh (5 req/hour per user) ────────────
+const refreshRateLimitMap = new Map<string, { count: number; resetAt: number }>();
+
+async function checkRefreshRateLimit(identifier: string): Promise<{ allowed: boolean; retryAfter: number }> {
+  const windowMs = 3_600_000; // 1 hour
+  const limit = 5;
+  const now = Date.now();
+
+  // Try Redis first
+  const redis = getRedisClient();
+  if (redis) {
+    try {
+      const key = `rl:refresh:${identifier}`;
+      const windowStart = now - windowMs;
+      const member = `${now}:${Math.random().toString(36).slice(2, 8)}`;
+
+      const pipeline = redis.pipeline();
+      pipeline.zremrangebyscore(key, 0, windowStart);
+      pipeline.zadd(key, now, member);
+      pipeline.zcard(key);
+      pipeline.pexpire(key, windowMs);
+
+      const results = await pipeline.exec();
+      const count = (results?.[2]?.[1] as number) ?? 0;
+      const retryAfter = Math.ceil(windowMs / 1000);
+      return { allowed: count <= limit, retryAfter };
+    } catch {
+      // Fall through to in-memory
+    }
+  }
+
+  // In-memory fallback
+  const entry = refreshRateLimitMap.get(identifier);
+  if (!entry || now > entry.resetAt) {
+    refreshRateLimitMap.set(identifier, { count: 1, resetAt: now + windowMs });
+    return { allowed: true, retryAfter: 0 };
+  }
+  entry.count++;
+  const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
+  return { allowed: entry.count <= limit, retryAfter };
+}
+
+// Periodic cleanup of expired in-memory refresh rate limit entries
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of refreshRateLimitMap) {
+    if (now > entry.resetAt) refreshRateLimitMap.delete(key);
+  }
+}, 60_000);
 
 // ─── POST /auth/apple ─────────────────────────────────────────────────────────
 // Sign in with Apple ID token.
@@ -16,6 +78,19 @@ auth.post('/apple', async (c) => {
 
     if (!body.id_token) {
       return c.json({ success: false, error: 'id_token is required' }, 400);
+    }
+
+    // Size limits: id_token max 8KB, full_name max 200 chars
+    if (body.id_token.length > 8192) {
+      return c.json({ success: false, error: 'id_token exceeds maximum allowed size' }, 400);
+    }
+    if (body.full_name && body.full_name.length > 200) {
+      return c.json({ success: false, error: 'full_name must be 200 characters or less' }, 400);
+    }
+
+    // Validate token format before sending to Supabase
+    if (!isValidJWTFormat(body.id_token)) {
+      return c.json({ success: false, error: 'Invalid id_token format' }, 400);
     }
 
     const { data: sessionData, error: signInError } =
@@ -89,6 +164,16 @@ auth.post('/google', async (c) => {
 
     if (!body.id_token) {
       return c.json({ success: false, error: 'id_token is required' }, 400);
+    }
+
+    // Size limit: id_token max 8KB
+    if (body.id_token.length > 8192) {
+      return c.json({ success: false, error: 'id_token exceeds maximum allowed size' }, 400);
+    }
+
+    // Validate token format before sending to Supabase
+    if (!isValidJWTFormat(body.id_token)) {
+      return c.json({ success: false, error: 'Invalid id_token format' }, 400);
     }
 
     const { data: sessionData, error: signInError } =
@@ -288,12 +373,30 @@ auth.post('/callback', async (c) => {
 
 // ─── POST /auth/refresh ──────────────────────────────────────────────────────
 // Refresh the access token using a refresh token.
+// Stricter rate limit: 5 requests per hour per user/IP.
 auth.post('/refresh', async (c) => {
   try {
     const { refresh_token } = await c.req.json<{ refresh_token: string }>();
 
     if (!refresh_token) {
       return c.json({ success: false, error: 'refresh_token is required' }, 400);
+    }
+
+    // Validate refresh token format (should be a valid JWT or opaque token, max 4KB)
+    if (refresh_token.length > 4096) {
+      return c.json({ success: false, error: 'refresh_token exceeds maximum allowed size' }, 400);
+    }
+
+    // Dedicated per-user rate limit for token refresh (5 req/hour)
+    const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    const rateLimitResult = await checkRefreshRateLimit(ip);
+
+    if (!rateLimitResult.allowed) {
+      c.header('Retry-After', String(rateLimitResult.retryAfter));
+      return c.json(
+        { success: false, error: 'Token refresh rate limit exceeded. Please try again later.' },
+        429
+      );
     }
 
     const { data, error } = await supabaseAdmin.auth.refreshSession({

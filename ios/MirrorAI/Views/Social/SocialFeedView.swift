@@ -93,7 +93,7 @@ struct SocialFeedView: View {
             .background(Color(UIColor.systemBackground))
             .navigationTitle(L10n.feedTitle)
             .navigationBarTitleDisplayMode(.inline)
-            .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+            .dynamicTypeSize(...DynamicTypeSize.accessibility5)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {

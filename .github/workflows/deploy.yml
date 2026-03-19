@@ -7,7 +7,30 @@ on:
     branches: [main]
 
 jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Run npm audit for known vulnerabilities
+        run: npm audit --audit-level=high
+      - name: Check for sensitive files in repo
+        run: |
+          echo "Checking for potential secrets or sensitive files..."
+          SENSITIVE_FILES=$(find . -maxdepth 3 -name ".env" -o -name ".env.local" -o -name "*.pem" -o -name "*.key" -o -name "credentials.json" | grep -v node_modules || true)
+          if [ -n "$SENSITIVE_FILES" ]; then
+            echo "WARNING: Potentially sensitive files found:"
+            echo "$SENSITIVE_FILES"
+            exit 1
+          fi
+          echo "No sensitive files detected."
+
   test:
+    needs: security
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

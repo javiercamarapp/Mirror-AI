@@ -66,7 +66,7 @@ interface GeminiResponse {
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1000;
 
-async function callGeminiRaw(request: GeminiRequest): Promise<string> {
+async function callGeminiRaw(request: GeminiRequest, requestId?: string): Promise<string> {
   const url = `${BASE_URL}:generateContent`;
 
   let lastError: Error | null = null;
@@ -81,12 +81,17 @@ async function callGeminiRaw(request: GeminiRequest): Promise<string> {
     const timeout = setTimeout(() => controller.abort(), 30000);
 
     try {
+      const hdrs: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': config.geminiApiKey,
+      };
+      if (requestId) {
+        hdrs['X-Request-Id'] = requestId;
+      }
+
       const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': config.geminiApiKey,
-        },
+        headers: hdrs,
         body: JSON.stringify(request),
         signal: controller.signal,
       });
@@ -122,12 +127,13 @@ async function callGeminiRaw(request: GeminiRequest): Promise<string> {
 
 /**
  * Call Gemini API wrapped with circuit breaker for fault tolerance.
+ * @param requestId Optional correlation ID propagated to the external API.
  */
-async function callGemini(request: GeminiRequest): Promise<string> {
+async function callGemini(request: GeminiRequest, requestId?: string): Promise<string> {
   try {
-    return await geminiBreaker.execute(() => callGeminiRaw(request));
+    return await geminiBreaker.execute(() => callGeminiRaw(request, requestId));
   } catch (error) {
-    logger.error({ err: error instanceof Error ? error.message : String(error) }, 'Gemini API call failed');
+    logger.error({ err: error instanceof Error ? error.message : String(error), requestId }, 'Gemini API call failed');
     throw sanitizeError(error);
   }
 }
@@ -139,8 +145,9 @@ function buildSystemInstruction(systemPrompt?: string): { parts: GeminiTextPart[
 
 /**
  * Generate text from a prompt.
+ * @param requestId Optional correlation ID for tracing across services.
  */
-export async function generateText(prompt: string, systemPrompt?: string): Promise<string> {
+export async function generateText(prompt: string, systemPrompt?: string, requestId?: string): Promise<string> {
   const request: GeminiRequest = {
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
     system_instruction: buildSystemInstruction(systemPrompt),
@@ -150,13 +157,14 @@ export async function generateText(prompt: string, systemPrompt?: string): Promi
     },
   };
 
-  return callGemini(request);
+  return callGemini(request, requestId);
 }
 
 /**
  * Generate text and parse the response as JSON.
+ * @param requestId Optional correlation ID for tracing across services.
  */
-export async function generateJSON<T>(prompt: string, systemPrompt?: string): Promise<T> {
+export async function generateJSON<T>(prompt: string, systemPrompt?: string, requestId?: string): Promise<T> {
   const request: GeminiRequest = {
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
     system_instruction: buildSystemInstruction(systemPrompt),
@@ -167,7 +175,7 @@ export async function generateJSON<T>(prompt: string, systemPrompt?: string): Pr
     },
   };
 
-  const raw = await callGemini(request);
+  const raw = await callGemini(request, requestId);
 
   try {
     return JSON.parse(raw) as T;
@@ -178,8 +186,9 @@ export async function generateJSON<T>(prompt: string, systemPrompt?: string): Pr
 
 /**
  * Analyze an image with a text prompt using Gemini vision.
+ * @param requestId Optional correlation ID for tracing across services.
  */
-export async function analyzeImage(imageBase64: string, prompt: string): Promise<string> {
+export async function analyzeImage(imageBase64: string, prompt: string, requestId?: string): Promise<string> {
   const request: GeminiRequest = {
     contents: [
       {
@@ -196,13 +205,14 @@ export async function analyzeImage(imageBase64: string, prompt: string): Promise
     },
   };
 
-  return callGemini(request);
+  return callGemini(request, requestId);
 }
 
 /**
  * Analyze an image with a text prompt and parse the response as JSON.
+ * @param requestId Optional correlation ID for tracing across services.
  */
-export async function analyzeImageJSON<T>(imageBase64: string, prompt: string): Promise<T> {
+export async function analyzeImageJSON<T>(imageBase64: string, prompt: string, requestId?: string): Promise<T> {
   const request: GeminiRequest = {
     contents: [
       {
@@ -220,7 +230,7 @@ export async function analyzeImageJSON<T>(imageBase64: string, prompt: string): 
     },
   };
 
-  const raw = await callGemini(request);
+  const raw = await callGemini(request, requestId);
 
   try {
     return JSON.parse(raw) as T;

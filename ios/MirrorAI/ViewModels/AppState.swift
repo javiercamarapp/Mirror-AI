@@ -48,6 +48,9 @@ class AppState {
     var vtonCredits = 0
     var vtonHistory: [VTONHistoryModel] = []
 
+    // ─── Token Expiry ──────────────────────────────────────────────────
+    var tokenExpiresAt: Date?
+
     // ─── Loading States ──────────────────────────────────────────────────
     var isLoading = false
     var errorMessage: String?
@@ -73,16 +76,42 @@ class AppState {
     /// Called on app launch -- checks persisted token, loads profile if available.
     func initialize() async {
         if let savedToken = KeychainManager.retrieve(forKey: tokenKey) {
+            // Restore token expiry
+            if let expiresStr = KeychainManager.retrieve(forKey: "mirror_ai_token_expires_at"),
+               let expiresInt = Int(expiresStr) {
+                tokenExpiresAt = Date(timeIntervalSince1970: TimeInterval(expiresInt))
+            }
             await setAuthToken(savedToken)
         }
     }
 
+    /// Ensures the current auth token is valid, refreshing proactively if it expires within 5 minutes.
+    /// Call this before each API call to avoid using expired tokens.
+    func ensureValidToken() async {
+        guard authToken != nil else { return }
+
+        // If we know the expiry and it's within 5 minutes, refresh proactively
+        if let expiresAt = tokenExpiresAt {
+            let timeUntilExpiry = expiresAt.timeIntervalSince(Date())
+            if timeUntilExpiry < 300 { // 5 minutes
+                Self.logger.info("Token expires in \(Int(timeUntilExpiry))s, refreshing proactively")
+                await refreshTokenIfNeeded()
+            }
+        }
+    }
+
     /// Set token, persist it, configure NetworkService, and load all user data.
-    func setAuthToken(_ token: String) async {
+    func setAuthToken(_ token: String, expiresAt: Int? = nil) async {
         authToken = token
         isLoggedIn = true
         _ = KeychainManager.save(token, forKey: tokenKey)
         await network.setAuthToken(token)
+
+        // Store token expiry timestamp
+        if let expiresAt {
+            tokenExpiresAt = Date(timeIntervalSince1970: TimeInterval(expiresAt))
+            _ = KeychainManager.save(String(expiresAt), forKey: "mirror_ai_token_expires_at")
+        }
 
         isLoading = true
         defer { isLoading = false }
@@ -124,9 +153,25 @@ class AppState {
         vtonCredits = 0
         vtonHistory = []
         errorMessage = nil
+        tokenExpiresAt = nil
 
         _ = KeychainManager.delete(forKey: tokenKey)
         _ = KeychainManager.delete(forKey: "mirror_ai_refresh_token")
+        _ = KeychainManager.delete(forKey: "mirror_ai_token_expires_at")
+
+        // Clear image caches (memory + disk)
+        ImageCache.shared.removeAll()
+        DiskImageCache.shared.removeAll()
+
+        // Clear offline data cache (feed + wardrobe)
+        offlineCache.clearAll()
+
+        // Clear any UserDefaults data
+        let mirrorKeys = ["mirror_ai_streak_count", "mirror_ai_style_score"]
+        for key in mirrorKeys {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+
         Task {
             await network.setAuthToken(nil)
         }
@@ -189,6 +234,12 @@ class AppState {
             authToken = refreshData.accessToken
             _ = KeychainManager.save(refreshData.accessToken, forKey: tokenKey)
             await network.setAuthToken(refreshData.accessToken)
+
+            // Update token expiry timestamp
+            if let expiresAt = refreshData.expiresAt {
+                tokenExpiresAt = Date(timeIntervalSince1970: TimeInterval(expiresAt))
+                _ = KeychainManager.save(String(expiresAt), forKey: "mirror_ai_token_expires_at")
+            }
 
         } catch {
             // On any error, try to keep going with existing token
@@ -268,7 +319,7 @@ class AppState {
             _ = KeychainManager.save(authData.refreshToken, forKey: "mirror_ai_refresh_token")
 
             // Set the access token (triggers profile load etc.)
-            await setAuthToken(authData.accessToken)
+            await setAuthToken(authData.accessToken, expiresAt: authData.expiresAt)
 
         } catch {
             handleError(error, context: "Apple sign in")

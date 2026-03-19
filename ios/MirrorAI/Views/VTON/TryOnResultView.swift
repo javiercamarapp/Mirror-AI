@@ -106,6 +106,8 @@ struct TryOnResultView: View {
             RoundedRectangle(cornerRadius: 20)
                 .strokeBorder(MirrorTheme.borderColor, lineWidth: 1)
         )
+        .accessibilityLabel(showBeforeAfter ? "Before image showing original garment" : "After image showing try-on result")
+        .accessibilityAddTraits(.isImage)
     }
 
     // MARK: - Before/After Toggle
@@ -147,6 +149,9 @@ struct TryOnResultView: View {
                         .padding(3)
                 )
         }
+        .accessibilityLabel("Show \(title)")
+        .accessibilityValue(isActive ? "Selected" : "")
+        .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
     }
 
     // MARK: - Garment Info
@@ -186,6 +191,8 @@ struct TryOnResultView: View {
                 Spacer()
             }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Garment: \(garmentItem.name), \(garmentItem.category)\(garmentItem.brand.map { !$0.isEmpty ? ", \($0)" : "" } ?? "")")
     }
 
     // MARK: - Action Buttons
@@ -211,6 +218,8 @@ struct TryOnResultView: View {
                 )
             }
             .disabled(savedToPhotos)
+            .accessibilityLabel(savedToPhotos ? "Saved to photos" : "Save to Photos")
+            .accessibilityHint("Saves the try-on result to your photo library")
 
             HStack(spacing: 12) {
                 // Share
@@ -237,6 +246,8 @@ struct TryOnResultView: View {
                             )
                     )
                 }
+                .accessibilityLabel("Share result")
+                .accessibilityHint("Opens sharing options for the try-on result")
 
                 // Try another
                 Button {
@@ -262,6 +273,8 @@ struct TryOnResultView: View {
                             )
                     )
                 }
+                .accessibilityLabel("Try another garment")
+                .accessibilityHint("Goes back to select a different garment")
             }
         }
     }

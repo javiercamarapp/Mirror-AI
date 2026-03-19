@@ -95,6 +95,8 @@ struct StoryCreatorView: View {
                     }
                     .padding(.trailing, 48)
                     .padding(.top, 8)
+                    .accessibilityLabel("Remove selected photo")
+                    .accessibilityHint("Removes the current photo selection")
                 }
                 .transition(.scale.combined(with: .opacity))
             } else {
@@ -137,6 +139,8 @@ struct StoryCreatorView: View {
                     )
                     .padding(.horizontal, 20)
                 }
+                .accessibilityLabel("Add a photo")
+                .accessibilityHint("Opens photo source selection to choose a photo for your story")
             }
         }
         .padding(.top, 12)
@@ -153,6 +157,8 @@ struct StoryCreatorView: View {
             TextField("Add a caption...", text: $caption, axis: .vertical)
                 .font(.system(size: 15))
                 .lineLimit(3)
+                .accessibilityLabel("Story caption")
+                .accessibilityHint("Enter a caption for your story")
                 .padding(14)
                 .background(
                     RoundedRectangle(cornerRadius: 14)
@@ -189,6 +195,8 @@ struct StoryCreatorView: View {
             .shadow(color: MirrorTheme.purple.opacity(0.4), radius: 12, y: 6)
         }
         .disabled(isPosting)
+        .accessibilityLabel("Share Story")
+        .accessibilityHint("Posts your story to your followers")
     }
 
     // MARK: - Post Story

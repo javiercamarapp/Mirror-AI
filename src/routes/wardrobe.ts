@@ -218,6 +218,11 @@ Return ONLY valid JSON.`
       return c.json({ success: false, error: error.message }, 500);
     }
 
+    // Refresh wardrobe stats materialized view asynchronously
+    supabaseAdmin.rpc('refresh_wardrobe_user_stats').catch((err) => {
+      logger.warn({ err }, 'Failed to refresh wardrobe_user_stats after item add');
+    });
+
     return c.json({ success: true, data }, 201);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
@@ -232,9 +237,17 @@ wardrobe.get('/stats', async (c) => {
   try {
     const userId = c.get('userId');
 
+    // Try to use the wardrobe_user_stats materialized view for aggregate stats
+    const { data: matStats } = await supabaseAdmin
+      .from('wardrobe_user_stats')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    // Still need items for most/least worn and favorites (not in materialized view)
     const { data: items, error } = await supabaseAdmin
       .from('wardrobe_items')
-      .select('*')
+      .select('id, name, category, wear_count, image_url, is_favorite, color, season')
       .eq('user_id', userId);
 
     if (error) {
@@ -243,10 +256,33 @@ wardrobe.get('/stats', async (c) => {
 
     const allItems = items ?? [];
 
-    // Items per category
-    const byCategory: Record<string, number> = {};
-    for (const item of allItems) {
-      byCategory[item.category] = (byCategory[item.category] ?? 0) + 1;
+    // Use materialized view data if available, otherwise compute from items
+    let byCategory: Record<string, number>;
+    let byColor: Record<string, number>;
+    let bySeason: Record<string, number>;
+
+    if (matStats) {
+      byCategory = (matStats.category_counts as Record<string, number>) ?? {};
+      byColor = (matStats.color_counts as Record<string, number>) ?? {};
+      bySeason = (matStats.season_counts as Record<string, number>) ?? {};
+    } else {
+      // Fallback: compute from items
+      byCategory = {};
+      for (const item of allItems) {
+        byCategory[item.category] = (byCategory[item.category] ?? 0) + 1;
+      }
+      byColor = {};
+      for (const item of allItems) {
+        const color = (item.color ?? 'unknown').toLowerCase();
+        byColor[color] = (byColor[color] ?? 0) + 1;
+      }
+      bySeason = {};
+      for (const item of allItems) {
+        const seasons: string[] = item.season ?? [];
+        for (const s of seasons) {
+          bySeason[s] = (bySeason[s] ?? 0) + 1;
+        }
+      }
     }
 
     // Most worn items (top 5)
@@ -277,29 +313,13 @@ wardrobe.get('/stats', async (c) => {
     // Never worn items
     const neverWorn = allItems.filter((item) => (item.wear_count ?? 0) === 0);
 
-    // Color distribution
-    const byColor: Record<string, number> = {};
-    for (const item of allItems) {
-      const color = (item.color ?? 'unknown').toLowerCase();
-      byColor[color] = (byColor[color] ?? 0) + 1;
-    }
-
-    // Season distribution
-    const bySeason: Record<string, number> = {};
-    for (const item of allItems) {
-      const seasons: string[] = item.season ?? [];
-      for (const s of seasons) {
-        bySeason[s] = (bySeason[s] ?? 0) + 1;
-      }
-    }
-
     // Favorites count
     const favoritesCount = allItems.filter((item) => item.is_favorite).length;
 
     return c.json({
       success: true,
       data: {
-        total_items: allItems.length,
+        total_items: matStats?.total_items ?? allItems.length,
         by_category: byCategory,
         by_color: byColor,
         by_season: bySeason,
@@ -415,6 +435,11 @@ wardrobe.delete('/:id', async (c) => {
     if (deleteError) {
       return c.json({ success: false, error: deleteError.message }, 500);
     }
+
+    // Refresh wardrobe stats materialized view asynchronously
+    supabaseAdmin.rpc('refresh_wardrobe_user_stats').catch((err) => {
+      logger.warn({ err }, 'Failed to refresh wardrobe_user_stats after item delete');
+    });
 
     // Clean up storage files
     if (item.image_url) {

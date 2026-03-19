@@ -226,23 +226,39 @@ social.post('/posts/:id/like', async (c) => {
       .maybeSingle();
 
     if (existing) {
-      // Unlike: remove the like and decrement count atomically
-      await supabaseAdmin.from('post_likes').delete().eq('id', existing.id);
+      // Unlike: remove the like and decrement count atomically via RPC
+      const { error: unlikeError } = await supabaseAdmin.rpc('atomic_unlike_post', {
+        p_like_id: existing.id,
+        p_post_id: postId,
+      });
 
-      // Decrement likes_count atomically using RPC
-      await supabaseAdmin.rpc('increment_post_likes', { p_post_id: postId, p_delta: -1 });
+      if (unlikeError) {
+        logger.error({ err: unlikeError }, 'Atomic unlike failed, falling back to sequential');
+        // Fallback: sequential delete + decrement
+        await supabaseAdmin.from('post_likes').delete().eq('id', existing.id);
+        await supabaseAdmin.rpc('increment_post_likes', { p_post_id: postId, p_delta: -1 });
+      }
 
       return c.json({ success: true, data: { liked: false } });
     } else {
-      // Like: add the like and increment count atomically
-      await supabaseAdmin.from('post_likes').insert({
-        id: uuidv4(),
-        post_id: postId,
-        user_id: userId,
+      // Like: add the like and increment count atomically via RPC
+      const likeId = uuidv4();
+      const { error: likeError } = await supabaseAdmin.rpc('atomic_like_post', {
+        p_like_id: likeId,
+        p_post_id: postId,
+        p_user_id: userId,
       });
 
-      // Increment likes_count atomically using RPC
-      await supabaseAdmin.rpc('increment_post_likes', { p_post_id: postId, p_delta: 1 });
+      if (likeError) {
+        logger.error({ err: likeError }, 'Atomic like failed, falling back to sequential');
+        // Fallback: sequential insert + increment
+        await supabaseAdmin.from('post_likes').insert({
+          id: likeId,
+          post_id: postId,
+          user_id: userId,
+        });
+        await supabaseAdmin.rpc('increment_post_likes', { p_post_id: postId, p_delta: 1 });
+      }
 
       // Get post info for notification
       const { data: post } = await supabaseAdmin
@@ -384,7 +400,11 @@ social.post('/posts/:id/comments', moderationMiddleware, async (c) => {
     }
 
     // Increment comments_count atomically using RPC
-    await supabaseAdmin.rpc('increment_post_comments', { p_post_id: postId, p_delta: 1 });
+    // If the counter increment fails, log but don't fail the request (comment was already created)
+    const { error: counterError } = await supabaseAdmin.rpc('increment_post_comments', { p_post_id: postId, p_delta: 1 });
+    if (counterError) {
+      logger.error({ err: counterError, postId }, 'Failed to increment comments_count after comment insert');
+    }
 
     // Get post owner for notification
     const { data: post } = await supabaseAdmin
@@ -651,7 +671,7 @@ social.get('/rankings', async (c) => {
     // Filter out blocked users from rankings
     const filteredIds = allIds.filter((id) => !blockedIds.has(id));
 
-    // For each user, calculate average outfit score from daily_outfits
+    // Use the user_rankings materialized view for pre-calculated scores
     const { data: profiles } = await supabaseAdmin
       .from('user_profiles')
       .select('id, full_name, avatar_url')
@@ -661,21 +681,16 @@ social.get('/rankings', async (c) => {
       return c.json({ success: true, data: [] });
     }
 
-    // Get scored outfits for all relevant users
-    const { data: allOutfits } = await supabaseAdmin
-      .from('daily_outfits')
-      .select('user_id, score')
-      .in('user_id', filteredIds)
-      .not('score', 'is', null);
+    // Fetch pre-calculated rankings from materialized view
+    const { data: rankingsData } = await supabaseAdmin
+      .from('user_rankings')
+      .select('user_id, avg_score, outfit_count')
+      .in('user_id', filteredIds);
 
-    // Calculate per-user stats
-    const userStats: Record<string, { totalScore: number; count: number }> = {};
-    for (const outfit of allOutfits ?? []) {
-      if (!userStats[outfit.user_id]) {
-        userStats[outfit.user_id] = { totalScore: 0, count: 0 };
-      }
-      userStats[outfit.user_id]!.totalScore += outfit.score ?? 0;
-      userStats[outfit.user_id]!.count += 1;
+    // Index rankings by user_id for fast lookup
+    const rankingsMap: Record<string, { avg_score: number; outfit_count: number }> = {};
+    for (const r of rankingsData ?? []) {
+      rankingsMap[r.user_id] = { avg_score: r.avg_score, outfit_count: r.outfit_count };
     }
 
     // Get streak data
@@ -722,20 +737,16 @@ social.get('/rankings', async (c) => {
       userStreaks[uid] = streak;
     }
 
-    // Build rankings
+    // Build rankings using materialized view data
     const rankings = profiles
       .map((profile) => {
-        const stats = userStats[profile.id];
-        const avgScore = stats && stats.count > 0
-          ? Math.round((stats.totalScore / stats.count) * 10) / 10
-          : 0;
-
+        const stats = rankingsMap[profile.id];
         return {
           user_id: profile.id,
           name: profile.full_name,
           avatar_url: profile.avatar_url,
-          average_score: avgScore,
-          outfits_rated: stats?.count ?? 0,
+          average_score: stats?.avg_score ?? 0,
+          outfits_rated: stats?.outfit_count ?? 0,
           streak: userStreaks[profile.id] ?? 0,
           is_current_user: profile.id === userId,
         };

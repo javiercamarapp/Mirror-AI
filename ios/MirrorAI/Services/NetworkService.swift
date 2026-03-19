@@ -369,23 +369,87 @@ actor NetworkService {
 
 // MARK: - Offline Data Cache
 
-/// Simple UserDefaults-based cache for offline access to recent feed posts and wardrobe items.
+/// File-based cache with Data Protection for offline access to recent feed posts and wardrobe items.
+/// Uses Library/Caches directory with .completeUntilFirstUserAuthentication protection level.
 final class OfflineDataCache: @unchecked Sendable {
     static let shared = OfflineDataCache()
     private static let logger = Logger(subsystem: "com.mirrorai", category: "OfflineDataCache")
 
-    private let defaults = UserDefaults.standard
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
+    private let fileManager = FileManager.default
+    private let cacheDirectory: URL
+    private let queue = DispatchQueue(label: "com.mirrorai.offlinecache", qos: .utility)
 
-    private let feedPostsKey = "mirror_ai_cached_feed_posts"
-    private let wardrobeItemsKey = "mirror_ai_cached_wardrobe_items"
-    private let feedTimestampKey = "mirror_ai_cached_feed_ts"
-    private let wardrobeTimestampKey = "mirror_ai_cached_wardrobe_ts"
+    private let feedPostsFile = "feed_posts.cache"
+    private let wardrobeItemsFile = "wardrobe_items.cache"
+    private let feedTimestampFile = "feed_ts.cache"
+    private let wardrobeTimestampFile = "wardrobe_ts.cache"
 
     private init() {
         encoder.keyEncodingStrategy = .convertToSnakeCase
         decoder.keyDecodingStrategy = .convertFromSnakeCase
+
+        let libCaches = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first!
+        cacheDirectory = libCaches.appendingPathComponent("OfflineData", isDirectory: true)
+        try? fileManager.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
+
+        // Migrate any existing UserDefaults data to file-based cache
+        migrateFromUserDefaults()
+    }
+
+    // MARK: - File Helpers
+
+    private func filePath(for name: String) -> URL {
+        cacheDirectory.appendingPathComponent(name)
+    }
+
+    private func writeProtected(_ data: Data, to name: String) {
+        let path = filePath(for: name)
+        do {
+            try data.write(to: path, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+        } catch {
+            Self.logger.error("Failed to write cache file \(name): \(error.localizedDescription)")
+        }
+    }
+
+    private func readProtected(from name: String) -> Data? {
+        let path = filePath(for: name)
+        guard fileManager.fileExists(atPath: path.path) else { return nil }
+        return try? Data(contentsOf: path)
+    }
+
+    // MARK: - Migration from UserDefaults
+
+    private func migrateFromUserDefaults() {
+        let defaults = UserDefaults.standard
+        let oldFeedKey = "mirror_ai_cached_feed_posts"
+        let oldWardrobeKey = "mirror_ai_cached_wardrobe_items"
+        let oldFeedTsKey = "mirror_ai_cached_feed_ts"
+        let oldWardrobeTsKey = "mirror_ai_cached_wardrobe_ts"
+
+        if let feedData = defaults.data(forKey: oldFeedKey) {
+            writeProtected(feedData, to: feedPostsFile)
+            defaults.removeObject(forKey: oldFeedKey)
+        }
+        if let wardrobeData = defaults.data(forKey: oldWardrobeKey) {
+            writeProtected(wardrobeData, to: wardrobeItemsFile)
+            defaults.removeObject(forKey: oldWardrobeKey)
+        }
+        if defaults.double(forKey: oldFeedTsKey) > 0 {
+            let ts = defaults.double(forKey: oldFeedTsKey)
+            if let tsData = String(ts).data(using: .utf8) {
+                writeProtected(tsData, to: feedTimestampFile)
+            }
+            defaults.removeObject(forKey: oldFeedTsKey)
+        }
+        if defaults.double(forKey: oldWardrobeTsKey) > 0 {
+            let ts = defaults.double(forKey: oldWardrobeTsKey)
+            if let tsData = String(ts).data(using: .utf8) {
+                writeProtected(tsData, to: wardrobeTimestampFile)
+            }
+            defaults.removeObject(forKey: oldWardrobeTsKey)
+        }
     }
 
     // MARK: - Feed Posts
@@ -393,8 +457,11 @@ final class OfflineDataCache: @unchecked Sendable {
     func cacheFeedPosts(_ posts: [SocialPostModel]) {
         do {
             let data = try encoder.encode(posts)
-            defaults.set(data, forKey: feedPostsKey)
-            defaults.set(Date().timeIntervalSince1970, forKey: feedTimestampKey)
+            queue.async { [weak self] in
+                self?.writeProtected(data, to: self?.feedPostsFile ?? "")
+                let tsData = String(Date().timeIntervalSince1970).data(using: .utf8)!
+                self?.writeProtected(tsData, to: self?.feedTimestampFile ?? "")
+            }
             Self.logger.info("Cached \(posts.count) feed posts for offline access")
         } catch {
             Self.logger.error("Failed to cache feed posts: \(error.localizedDescription)")
@@ -402,7 +469,7 @@ final class OfflineDataCache: @unchecked Sendable {
     }
 
     func loadCachedFeedPosts() -> (posts: [SocialPostModel], isCached: Bool)? {
-        guard let data = defaults.data(forKey: feedPostsKey) else { return nil }
+        guard let data = readProtected(from: feedPostsFile) else { return nil }
         do {
             let posts = try decoder.decode([SocialPostModel].self, from: data)
             Self.logger.info("Loaded \(posts.count) cached feed posts")
@@ -414,8 +481,9 @@ final class OfflineDataCache: @unchecked Sendable {
     }
 
     var feedCacheAge: TimeInterval? {
-        let ts = defaults.double(forKey: feedTimestampKey)
-        guard ts > 0 else { return nil }
+        guard let data = readProtected(from: feedTimestampFile),
+              let str = String(data: data, encoding: .utf8),
+              let ts = Double(str), ts > 0 else { return nil }
         return Date().timeIntervalSince1970 - ts
     }
 
@@ -424,8 +492,11 @@ final class OfflineDataCache: @unchecked Sendable {
     func cacheWardrobeItems(_ items: [WardrobeItemModel]) {
         do {
             let data = try encoder.encode(items)
-            defaults.set(data, forKey: wardrobeItemsKey)
-            defaults.set(Date().timeIntervalSince1970, forKey: wardrobeTimestampKey)
+            queue.async { [weak self] in
+                self?.writeProtected(data, to: self?.wardrobeItemsFile ?? "")
+                let tsData = String(Date().timeIntervalSince1970).data(using: .utf8)!
+                self?.writeProtected(tsData, to: self?.wardrobeTimestampFile ?? "")
+            }
             Self.logger.info("Cached \(items.count) wardrobe items for offline access")
         } catch {
             Self.logger.error("Failed to cache wardrobe items: \(error.localizedDescription)")
@@ -433,7 +504,7 @@ final class OfflineDataCache: @unchecked Sendable {
     }
 
     func loadCachedWardrobeItems() -> (items: [WardrobeItemModel], isCached: Bool)? {
-        guard let data = defaults.data(forKey: wardrobeItemsKey) else { return nil }
+        guard let data = readProtected(from: wardrobeItemsFile) else { return nil }
         do {
             let items = try decoder.decode([WardrobeItemModel].self, from: data)
             Self.logger.info("Loaded \(items.count) cached wardrobe items")
@@ -445,18 +516,20 @@ final class OfflineDataCache: @unchecked Sendable {
     }
 
     var wardrobeCacheAge: TimeInterval? {
-        let ts = defaults.double(forKey: wardrobeTimestampKey)
-        guard ts > 0 else { return nil }
+        guard let data = readProtected(from: wardrobeTimestampFile),
+              let str = String(data: data, encoding: .utf8),
+              let ts = Double(str), ts > 0 else { return nil }
         return Date().timeIntervalSince1970 - ts
     }
 
     // MARK: - Clear
 
     func clearAll() {
-        defaults.removeObject(forKey: feedPostsKey)
-        defaults.removeObject(forKey: wardrobeItemsKey)
-        defaults.removeObject(forKey: feedTimestampKey)
-        defaults.removeObject(forKey: wardrobeTimestampKey)
+        queue.async { [weak self] in
+            guard let self else { return }
+            try? self.fileManager.removeItem(at: self.cacheDirectory)
+            try? self.fileManager.createDirectory(at: self.cacheDirectory, withIntermediateDirectories: true)
+        }
         Self.logger.info("Cleared all offline caches")
     }
 }

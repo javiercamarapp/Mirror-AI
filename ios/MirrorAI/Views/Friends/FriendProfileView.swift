@@ -99,6 +99,7 @@ struct FriendProfileView: View {
             VStack(spacing: 6) {
                 Text(friend.fullName ?? "Friend")
                     .font(.system(size: 24, weight: .bold))
+                    .accessibilityAddTraits(.isHeader)
 
                 if let username = friend.username {
                     Text("@\(username)")
@@ -138,6 +139,8 @@ struct FriendProfileView: View {
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(label): \(value)")
     }
 
     // MARK: - Actions
@@ -168,6 +171,8 @@ struct FriendProfileView: View {
                         .fill(MirrorTheme.gradientPrimary)
                 )
             }
+            .accessibilityLabel("View \(friend.fullName ?? "friend")'s closet")
+            .accessibilityHint("Opens their wardrobe items")
 
             Button {
                 showUnfriendAlert = true
@@ -190,6 +195,8 @@ struct FriendProfileView: View {
                         )
                 )
             }
+            .accessibilityLabel("Unfriend \(friend.fullName ?? "this person")")
+            .accessibilityHint("Removes this person from your friends list")
         }
     }
 
@@ -199,6 +206,7 @@ struct FriendProfileView: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Recent Posts")
                 .font(.system(size: 18, weight: .bold))
+                .accessibilityAddTraits(.isHeader)
 
             GlassCard {
                 VStack(spacing: 12) {
@@ -284,5 +292,7 @@ struct FriendProfileView: View {
                 .lineLimit(1)
                 .foregroundStyle(.secondary)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(item.name)")
     }
 }

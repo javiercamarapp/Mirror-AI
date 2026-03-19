@@ -42,7 +42,7 @@ struct AIStylistChatView: View {
             .background(Color(UIColor.systemBackground))
             .navigationTitle(L10n.tabHome == "Home" ? "AI Stylist" : "AI Stylist")
             .navigationBarTitleDisplayMode(.inline)
-            .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+            .dynamicTypeSize(...DynamicTypeSize.accessibility5)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Close") { dismiss() }

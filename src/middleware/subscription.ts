@@ -1,33 +1,7 @@
 import type { Context, Next } from 'hono';
 import { supabaseAdmin } from '../services/supabase.js';
+import { PLAN_LIMITS, PLAN_RANK } from '../services/subscriptionService.js';
 import type { AppVariables, SubscriptionPlan } from '../types/index.js';
-
-/**
- * Plan hierarchy for tier comparison.
- */
-const PLAN_RANK: Record<string, number> = {
-  free: 0,
-  basic: 1,
-  premium: 2,
-};
-
-/**
- * Wardrobe item limits by plan.
- */
-export const WARDROBE_LIMITS: Record<string, number> = {
-  free: 50,
-  basic: 200,
-  premium: -1, // unlimited
-};
-
-/**
- * Daily AI chat limits by plan.
- */
-export const AI_CHAT_DAILY_LIMITS: Record<string, number> = {
-  free: 10,
-  basic: 50,
-  premium: -1, // unlimited
-};
 
 /**
  * Middleware factory that requires the user to have at least the specified
@@ -81,6 +55,24 @@ export function requireSubscription(minimumTier: 'basic' | 'premium') {
     await next();
   };
 }
+
+/**
+ * Wardrobe item limits by plan — derived from the centralized PLAN_LIMITS.
+ */
+export const WARDROBE_LIMITS: Record<string, number> = {
+  free: PLAN_LIMITS.free.wardrobe_limit,
+  basic: PLAN_LIMITS.basic.wardrobe_limit,
+  premium: PLAN_LIMITS.premium.wardrobe_limit,
+};
+
+/**
+ * Daily AI chat limits by plan — derived from the centralized PLAN_LIMITS.
+ */
+export const AI_CHAT_DAILY_LIMITS: Record<string, number> = {
+  free: PLAN_LIMITS.free.ai_chats_daily,
+  basic: PLAN_LIMITS.basic.ai_chats_daily,
+  premium: PLAN_LIMITS.premium.ai_chats_daily,
+};
 
 /**
  * Helper to get the user's current subscription plan from the database.

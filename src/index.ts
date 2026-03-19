@@ -8,6 +8,7 @@ import { isRedisHealthy, disconnectRedis } from './services/redis.js';
 import { requestLogger } from './middleware/requestLogger.js';
 import { rateLimiter } from './middleware/rateLimiter.js';
 import { globalErrorHandler, notFoundHandler } from './middleware/errorHandler.js';
+import { geminiBreaker, fashnBreaker, fireworksBreaker } from './services/circuit-breaker.js';
 import type { AppVariables } from './types/index.js';
 import { authRoutes } from './routes/auth.js';
 import { userRoutes } from './routes/user.js';
@@ -34,6 +35,96 @@ const APP_VERSION = pkg.version;
 const startTime = Date.now();
 
 const app = new Hono<{ Variables: AppVariables }>();
+
+// ─── Prometheus-Style Metrics Collector ──────────────────────────────────────
+
+const metrics = {
+  requestCount: new Map<string, number>(),
+  requestDurations: [] as number[],
+  activeConnections: 0,
+};
+
+/** Increment a counter by key. */
+function incCounter(key: string): void {
+  metrics.requestCount.set(key, (metrics.requestCount.get(key) ?? 0) + 1);
+}
+
+/** Record a request duration sample (seconds). */
+function recordDuration(seconds: number): void {
+  metrics.requestDurations.push(seconds);
+  // Keep a rolling window of the last 10 000 samples to bound memory
+  if (metrics.requestDurations.length > 10_000) {
+    metrics.requestDurations.splice(0, metrics.requestDurations.length - 10_000);
+  }
+}
+
+/** Build histogram buckets from duration samples. */
+function buildHistogram(samples: number[]): Record<string, number> {
+  const buckets = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, Infinity];
+  const counts: Record<string, number> = {};
+  for (const b of buckets) {
+    const label = b === Infinity ? '+Inf' : String(b);
+    counts[label] = samples.filter((s) => s <= b).length;
+  }
+  return counts;
+}
+
+// ─── Active Connection Tracking Middleware ────────────────────────────────────
+
+let isShuttingDown = false;
+
+app.use('*', async (c, next) => {
+  if (isShuttingDown) {
+    return c.json({ success: false, error: 'Server is shutting down' }, 503);
+  }
+  metrics.activeConnections++;
+  const start = Date.now();
+  try {
+    await next();
+  } finally {
+    metrics.activeConnections--;
+    const durationSec = (Date.now() - start) / 1000;
+    recordDuration(durationSec);
+    const key = `${c.req.method}|${c.req.routePath || c.req.path}|${c.res.status}`;
+    incCounter(key);
+  }
+});
+
+// ─── Request Timeout Middleware ──────────────────────────────────────────────
+
+app.use('*', async (c, next) => {
+  const path = c.req.path;
+  const isLongRunning =
+    path.includes('/images/') ||
+    path.includes('/avatar') ||
+    path.includes('/vton') ||
+    path.includes('/ai/');
+
+  const timeoutMs = isLongRunning ? 120_000 : 30_000; // 120s for image/AI, 30s default
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    // Race the handler against the timeout
+    await new Promise<void>((resolve, reject) => {
+      controller.signal.addEventListener('abort', () => {
+        reject(new Error('GATEWAY_TIMEOUT'));
+      });
+      next().then(resolve).catch(reject);
+    });
+  } catch (err) {
+    if (err instanceof Error && err.message === 'GATEWAY_TIMEOUT') {
+      return c.json(
+        { success: false, error: 'Request timed out', code: 'GATEWAY_TIMEOUT' },
+        504
+      );
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+});
 
 // ─── Request Body Size Limits ────────────────────────────────────────────────
 // Global limit: reject any request body larger than 10 MB.
@@ -98,6 +189,51 @@ app.use('*', async (c, next) => {
 // ─── Redis-Based Rate Limiter ───────────────────────────────────────────────
 
 app.use('*', rateLimiter);
+
+// ─── Prometheus Metrics Endpoint ─────────────────────────────────────────────
+
+app.get('/metrics', (c) => {
+  const lines: string[] = [];
+
+  // request_count by method, path, status
+  lines.push('# HELP request_count Total number of HTTP requests');
+  lines.push('# TYPE request_count counter');
+  for (const [key, count] of metrics.requestCount) {
+    const [method, path, status] = key.split('|');
+    lines.push(`request_count{method="${method}",path="${path}",status="${status}"} ${count}`);
+  }
+
+  // request_duration_seconds histogram
+  lines.push('# HELP request_duration_seconds Request duration in seconds');
+  lines.push('# TYPE request_duration_seconds histogram');
+  const histogram = buildHistogram(metrics.requestDurations);
+  for (const [bucket, count] of Object.entries(histogram)) {
+    lines.push(`request_duration_seconds_bucket{le="${bucket}"} ${count}`);
+  }
+  const sum = metrics.requestDurations.reduce((a, b) => a + b, 0);
+  lines.push(`request_duration_seconds_sum ${sum.toFixed(6)}`);
+  lines.push(`request_duration_seconds_count ${metrics.requestDurations.length}`);
+
+  // active_connections gauge
+  lines.push('# HELP active_connections Current number of active connections');
+  lines.push('# TYPE active_connections gauge');
+  lines.push(`active_connections ${metrics.activeConnections}`);
+
+  // circuit_breaker_state by service
+  lines.push('# HELP circuit_breaker_state Circuit breaker state (0=CLOSED, 1=HALF_OPEN, 2=OPEN)');
+  lines.push('# TYPE circuit_breaker_state gauge');
+  const stateValue = (state: string): number => {
+    if (state === 'CLOSED') return 0;
+    if (state === 'HALF_OPEN') return 1;
+    return 2; // OPEN
+  };
+  lines.push(`circuit_breaker_state{service="gemini"} ${stateValue(geminiBreaker.getState())}`);
+  lines.push(`circuit_breaker_state{service="fashn"} ${stateValue(fashnBreaker.getState())}`);
+  lines.push(`circuit_breaker_state{service="fireworks"} ${stateValue(fireworksBreaker.getState())}`);
+
+  c.header('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
+  return c.text(lines.join('\n') + '\n');
+});
 
 // ─── Health Check Endpoints ─────────────────────────────────────────────────
 
@@ -167,6 +303,21 @@ app.get('/api/health/ready', async (c) => {
     allHealthy = false;
   }
 
+  // Circuit breaker states
+  const circuitBreakers: Record<string, string> = {
+    gemini: geminiBreaker.getState(),
+    fashn: fashnBreaker.getState(),
+    fireworks: fireworksBreaker.getState(),
+  };
+
+  // If any breaker is OPEN, mark as degraded
+  for (const [name, state] of Object.entries(circuitBreakers)) {
+    if (state === 'OPEN') {
+      checks[`circuit_breaker_${name}`] = { status: 'OPEN' };
+      allHealthy = false;
+    }
+  }
+
   const status = allHealthy ? 'ready' : 'degraded';
   const httpStatus = allHealthy ? 200 : 503;
 
@@ -177,6 +328,7 @@ app.get('/api/health/ready', async (c) => {
       uptime: Math.floor((Date.now() - startTime) / 1000),
       timestamp: new Date().toISOString(),
       checks,
+      circuitBreakers,
     },
     httpStatus
   );
@@ -219,9 +371,13 @@ const server = serve(
   }
 );
 
-// Graceful shutdown
+// ─── Graceful Shutdown with Request Draining ─────────────────────────────────
+
 const gracefulShutdown = async (signal: string) => {
   logger.info({ signal }, 'Shutting down gracefully');
+
+  // Stop accepting new requests
+  isShuttingDown = true;
 
   // Disconnect Redis before closing the server
   try {
@@ -230,16 +386,30 @@ const gracefulShutdown = async (signal: string) => {
     logger.error({ err }, 'Error disconnecting Redis during shutdown');
   }
 
+  // Wait for active connections to drain (check every 500ms, up to 10s)
+  const drainDeadline = Date.now() + 10_000;
+  while (metrics.activeConnections > 0 && Date.now() < drainDeadline) {
+    logger.info({ activeConnections: metrics.activeConnections }, 'Waiting for active requests to drain');
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+
+  if (metrics.activeConnections > 0) {
+    logger.warn(
+      { activeConnections: metrics.activeConnections },
+      'Forcing shutdown with active connections still open'
+    );
+  }
+
   server.close(() => {
     logger.info('Server closed');
     process.exit(0);
   });
 
-  // Force close after 10s
+  // Force close after 15s (extended from 10s to allow drain time)
   setTimeout(() => {
     logger.error('Forced shutdown after timeout');
     process.exit(1);
-  }, 10000);
+  }, 15000);
 };
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));

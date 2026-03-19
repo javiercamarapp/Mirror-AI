@@ -186,7 +186,7 @@ struct StoryViewerView: View {
                     .overlay {
                         Image(systemName: "person.fill")
                             .font(.system(size: 16))
-                            .foregroundStyle(.white.opacity(0.7))
+                            .foregroundStyle(.white.opacity(0.85))
                     }
             }
 
@@ -198,7 +198,7 @@ struct StoryViewerView: View {
                 if let story = currentStory {
                     Text(relativeTime(from: story.createdAt))
                         .font(.system(size: 11))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(.white.opacity(0.85))
                 }
             }
 
@@ -214,6 +214,7 @@ struct StoryViewerView: View {
                     .background(Circle().fill(Color.white.opacity(0.15)))
             }
             .accessibilityLabel(L10n.a11yCloseButton)
+        .accessibilityHint("Closes the story viewer")
         }
     }
 

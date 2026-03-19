@@ -1,5 +1,6 @@
 import type { Context } from 'hono';
 import { logger } from '../services/logger.js';
+import { AppError } from '../utils/errors.js';
 
 /**
  * Consistent error response shape returned by the API.
@@ -32,6 +33,10 @@ function statusToCode(status: number): string {
       return 'UNPROCESSABLE_ENTITY';
     case 429:
       return 'RATE_LIMITED';
+    case 502:
+      return 'BAD_GATEWAY';
+    case 504:
+      return 'GATEWAY_TIMEOUT';
     default:
       return 'INTERNAL_SERVER_ERROR';
   }
@@ -40,13 +45,25 @@ function statusToCode(status: number): string {
 /**
  * Global error handler for Hono's app.onError.
  *
+ * - Handles custom AppError instances with proper status codes
  * - Logs full error details with structured logger
  * - Sanitizes error messages in production (no stack traces leaked)
- * - Returns consistent error response format
+ * - Returns consistent error response format with error code field
  */
 export function globalErrorHandler(err: Error, c: Context): Response {
   const requestId = (c.get('requestId' as never) as string) || 'unknown';
-  const status = 'status' in err ? (err as { status: number }).status : 500;
+
+  // Determine status code and error code from AppError or fallback
+  let status: number;
+  let errorCode: string;
+
+  if (err instanceof AppError) {
+    status = err.statusCode;
+    errorCode = err.code;
+  } else {
+    status = 'status' in err ? (err as { status: number }).status : 500;
+    errorCode = statusToCode(status);
+  }
 
   // Log the full error with stack trace for debugging
   logger.error(
@@ -56,6 +73,7 @@ export function globalErrorHandler(err: Error, c: Context): Response {
       method: c.req.method,
       path: c.req.path,
       status,
+      errorCode,
     },
     `Unhandled error: ${err.message}`
   );
@@ -70,7 +88,7 @@ export function globalErrorHandler(err: Error, c: Context): Response {
   const body: ErrorResponse = {
     success: false,
     error: {
-      code: statusToCode(status),
+      code: errorCode,
       message,
       requestId,
     },
