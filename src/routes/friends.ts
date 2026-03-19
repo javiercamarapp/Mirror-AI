@@ -165,7 +165,7 @@ friends.post('/request', async (c) => {
       `${requester?.full_name ?? 'Someone'} sent you a friend request`,
       'Accept to share outfits and see each other\'s wardrobes',
       { type: 'friend_request', friendship_id: request.id, requester_id: userId }
-    ).catch(() => {});
+    ).catch((err) => { logger.warn({ err, targetId }, 'Failed to send friend request push notification'); });
 
     return c.json({ success: true, data: request }, 201);
   } catch (err) {
@@ -260,7 +260,7 @@ friends.post('/accept/:id', async (c) => {
       `${accepter?.full_name ?? 'Someone'} accepted your friend request`,
       'You can now share outfits and view each other\'s wardrobes',
       { type: 'friend_accepted', friendship_id: data.id }
-    ).catch(() => {});
+    ).catch((err) => { logger.warn({ err }, 'Failed to send friend accepted push notification'); });
 
     return c.json({ success: true, data });
   } catch (err) {

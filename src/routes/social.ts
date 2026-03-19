@@ -333,7 +333,7 @@ social.post('/posts/:id/like', async (c) => {
             `${likerName} liked your outfit`,
             'Check it out!',
             { type: 'like', post_id: postId }
-          ).catch(() => {});
+          ).catch((err) => { logger.warn({ err, postId }, 'Failed to send like push notification'); });
         }
       }
 
@@ -450,7 +450,7 @@ social.post('/posts/:id/comments', validateBody(schemas.createComment), moderati
           `${commenterName} commented on your outfit`,
           commentPreview,
           { type: 'comment', post_id: postId, comment_id: comment.id }
-        ).catch(() => {});
+        ).catch((err) => { logger.warn({ err, postId }, 'Failed to send comment push notification'); });
       }
     }
 
@@ -1085,7 +1085,7 @@ social.post('/admin/reports/:id/action', async (c) => {
       action: 'warn' | 'suspend' | 'ban';
       reason?: string;
       suspend_days?: number;
-    }>();
+    };
 
     if (!body.action || !['warn', 'suspend', 'ban'].includes(body.action)) {
       return c.json({ success: false, error: 'action must be "warn", "suspend", or "ban"' }, 400);

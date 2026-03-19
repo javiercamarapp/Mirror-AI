@@ -26,6 +26,15 @@ const ADMIN_USER_IDS: string[] = (() => {
 const adminRateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const ADMIN_RATE_LIMIT = 30; // requests per window
 const ADMIN_RATE_WINDOW_MS = 60_000; // 1 minute
+const ADMIN_RATE_LIMIT_MAX_ENTRIES = 1000;
+
+// Periodic cleanup of expired admin rate limit entries
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of adminRateLimitMap) {
+    if (now >= entry.resetAt) adminRateLimitMap.delete(key);
+  }
+}, ADMIN_RATE_WINDOW_MS);
 
 // All admin routes require authentication
 admin.use('*', authMiddleware);
@@ -46,6 +55,11 @@ admin.use('*', async (c, next) => {
   const now = Date.now();
   let bucket = adminRateLimitMap.get(userId);
   if (!bucket || now >= bucket.resetAt) {
+    // Evict oldest entries if map is too large (prevents memory leak)
+    if (adminRateLimitMap.size >= ADMIN_RATE_LIMIT_MAX_ENTRIES) {
+      const firstKey = adminRateLimitMap.keys().next().value;
+      if (firstKey) adminRateLimitMap.delete(firstKey);
+    }
     bucket = { count: 0, resetAt: now + ADMIN_RATE_WINDOW_MS };
     adminRateLimitMap.set(userId, bucket);
   }

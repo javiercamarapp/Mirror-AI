@@ -1,6 +1,32 @@
 import sharp from 'sharp';
 import { config } from '../config.js';
 
+/** Allowed URL protocols for image downloads (SSRF protection). */
+const ALLOWED_PROTOCOLS = new Set(['https:', 'http:']);
+const PRIVATE_IP_RANGES = [
+  /^127\./,
+  /^10\./,
+  /^172\.(1[6-9]|2\d|3[01])\./,
+  /^192\.168\./,
+  /^0\./,
+  /^169\.254\./,
+  /^::1$/,
+  /^fc00:/,
+  /^fe80:/,
+];
+
+function isPrivateUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (!ALLOWED_PROTOCOLS.has(parsed.protocol)) return true;
+    const hostname = parsed.hostname;
+    if (hostname === 'localhost' || hostname === '[::1]') return true;
+    return PRIVATE_IP_RANGES.some((re) => re.test(hostname));
+  } catch {
+    return true;
+  }
+}
+
 /**
  * Remove the background from an image buffer.
  *
@@ -18,8 +44,13 @@ export async function removeBackground(imageBuffer: Buffer): Promise<Buffer> {
 
 /**
  * Download an image from a URL and remove its background.
+ * Validates the URL to prevent SSRF attacks against internal services.
  */
 export async function removeBackgroundFromUrl(imageUrl: string): Promise<Buffer> {
+  if (isPrivateUrl(imageUrl)) {
+    throw new Error('Invalid image URL: private/internal addresses are not allowed');
+  }
+
   const response = await fetch(imageUrl);
 
   if (!response.ok) {

@@ -8,8 +8,9 @@
 import * as jose from 'jose';
 import crypto from 'node:crypto';
 import { logger } from './logger.js';
+import { config } from '../config.js';
 
-const EXPECTED_BUNDLE_ID = 'com.mirrorai.app';
+const EXPECTED_BUNDLE_ID = config.apnsBundleId || 'com.mirrorai.app';
 
 /**
  * Apple's Root CA — G3 certificate in PEM format.
