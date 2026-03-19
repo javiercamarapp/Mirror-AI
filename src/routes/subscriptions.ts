@@ -26,20 +26,20 @@ subscriptions.post('/webhooks/appstore', async (c) => {
     // Step 2: Verify the JWS signature against Apple's certificate chain
     const notification = await verifySignedPayload(body.signedPayload);
     if (!notification) {
-      console.warn('[App Store Webhook] Rejected: signature verification failed');
+      logger.warn('App Store Webhook rejected: signature verification failed');
       return c.json({ success: false, error: 'Invalid webhook signature' }, 403);
     }
 
     const { notificationType, data: notificationData } = notification;
 
-    console.log(`[App Store Webhook] Verified notification: ${notificationType}`);
+    logger.info({ notificationType }, 'App Store Webhook: verified notification');
 
     // Step 3: Verify the nested signedTransactionInfo if present
     let transactionData: Awaited<ReturnType<typeof verifyTransaction>> | null = null;
     if (notificationData?.signedTransactionInfo) {
       transactionData = await verifyTransaction(notificationData.signedTransactionInfo);
       if (!transactionData.isValid) {
-        console.warn('[App Store Webhook] Rejected: nested transaction verification failed');
+        logger.warn('App Store Webhook rejected: nested transaction verification failed');
         return c.json({ success: false, error: 'Invalid transaction in notification' }, 400);
       }
     }
@@ -165,7 +165,7 @@ subscriptions.post('/webhooks/appstore', async (c) => {
     return c.json({ success: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[App Store Webhook Error]:', err);
+    logger.error({ err }, 'App Store Webhook error');
     return c.json({ success: false, error: message }, 500);
   }
 });
