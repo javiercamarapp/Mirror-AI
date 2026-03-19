@@ -966,30 +966,6 @@ social.post('/posts/:id/share', async (c) => {
   }
 });
 
-// ─── Admin Middleware ──────────────────────────────────────────────────────────
-// Checks if the current user has admin privileges via the moderation_status or
-// a dedicated ADMIN_USER_IDS environment variable.
-async function requireAdmin(c: ReturnType<typeof social.get extends (path: string, ...args: infer A) => unknown ? never : never> extends never ? Parameters<Parameters<typeof social.get>[1]>[0] : never): Promise<boolean> {
-  const userId = c.get('userId');
-
-  // Check env-based admin list first
-  const adminIds = process.env.ADMIN_USER_IDS?.split(',').map((id) => id.trim()) ?? [];
-  if (adminIds.includes(userId)) {
-    return true;
-  }
-
-  // Check if user has admin role in the database
-  const { data: profile } = await supabaseAdmin
-    .from('user_profiles')
-    .select('moderation_status')
-    .eq('id', userId)
-    .single();
-
-  // Only users explicitly in ADMIN_USER_IDS or with a special flag are admins
-  // For now, check the env var as the primary mechanism
-  return false;
-}
-
 // ─── GET /social/admin/reports ─────────────────────────────────────────────────
 // List pending content reports with pagination. Admin only.
 social.get('/admin/reports', async (c) => {

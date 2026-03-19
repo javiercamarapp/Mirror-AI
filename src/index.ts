@@ -20,6 +20,7 @@ import { socialRoutes } from './routes/social.js';
 import { friendsRoutes } from './routes/friends.js';
 import { subscriptionRoutes } from './routes/subscriptions.js';
 import { avatarRoutes } from './routes/avatar.js';
+import { adminRoutes } from './routes/admin.js';
 
 // ─── Read package.json version at startup ────────────────────────────────────
 
@@ -135,6 +136,7 @@ app.route('/api/social', socialRoutes);
 app.route('/api/friends', friendsRoutes);
 app.route('/api/subscriptions', subscriptionRoutes);
 app.route('/api/avatar', avatarRoutes);
+app.route('/api/admin', adminRoutes);
 
 // ─── 404 Fallback ────────────────────────────────────────────────────────────
 

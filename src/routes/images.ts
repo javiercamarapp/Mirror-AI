@@ -3,6 +3,7 @@ import sharp from 'sharp';
 import { authMiddleware } from '../middleware/auth.js';
 import { removeBackground } from '../services/rembg.js';
 import { uploadImage } from '../services/storage.js';
+import { logger } from '../services/logger.js';
 import type { AppVariables } from '../types/index.js';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -70,7 +71,7 @@ images.post('/upload', async (c) => {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[Upload Error]:', err);
+    logger.error({ err }, 'Image upload failed');
     return c.json({ success: false, error: message }, 500);
   }
 });
@@ -111,7 +112,7 @@ images.post('/remove-bg', async (c) => {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[Remove BG Error]:', err);
+    logger.error({ err }, 'Background removal failed');
     return c.json({ success: false, error: message }, 500);
   }
 });
@@ -183,7 +184,7 @@ images.post('/collage', async (c) => {
       if (result.status === 'fulfilled') {
         imageBuffers.push(result.value);
       } else {
-        console.error('Failed to download collage image:', result.reason);
+        logger.error({ err: result.reason }, 'Failed to download collage image');
       }
     }
 
@@ -271,7 +272,7 @@ images.post('/collage', async (c) => {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[Collage Error]:', err);
+    logger.error({ err }, 'Collage generation failed');
     return c.json({ success: false, error: message }, 500);
   }
 });
