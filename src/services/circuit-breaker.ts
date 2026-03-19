@@ -1,3 +1,5 @@
+import { logger } from './logger.js';
+
 type CircuitState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
 
 interface CircuitBreakerOptions {
@@ -47,8 +49,9 @@ export class CircuitBreaker {
     this.lastFailureTime = Date.now();
     if (this.failureCount >= this.options.failureThreshold) {
       this.state = 'OPEN';
-      console.error(
-        `[CircuitBreaker] "${this.options.name}" opened after ${this.failureCount} failures`
+      logger.error(
+        { breaker: this.options.name, failures: this.failureCount },
+        `Circuit breaker "${this.options.name}" opened after ${this.failureCount} failures`
       );
     }
   }

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MainTabView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var selectedTab: Tab = .home
     @State private var showCreateSheet = false
 
@@ -36,17 +37,18 @@ struct MainTabView: View {
         .sheet(isPresented: $showCreateSheet) {
             createActionSheet
         }
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }
 
     // MARK: - Custom Tab Bar
 
     private var customTabBar: some View {
         HStack(spacing: 0) {
-            tabBarItem(tab: .home, icon: "house.fill", label: "Home")
-            tabBarItem(tab: .wardrobe, icon: "tshirt.fill", label: "Wardrobe")
+            tabBarItem(tab: .home, icon: "house.fill", label: L10n.tabHome)
+            tabBarItem(tab: .wardrobe, icon: "tshirt.fill", label: L10n.tabWardrobe)
             createButton
-            tabBarItem(tab: .social, icon: "person.2.fill", label: "Social")
-            tabBarItem(tab: .profile, icon: "person.crop.circle.fill", label: "Profile")
+            tabBarItem(tab: .social, icon: "person.2.fill", label: L10n.tabSocial)
+            tabBarItem(tab: .profile, icon: "person.crop.circle.fill", label: L10n.tabProfile)
         }
         .padding(.horizontal, 8)
         .padding(.top, 12)
@@ -70,6 +72,7 @@ struct MainTabView: View {
                         .frame(height: 0.5)
                 }
                 .ignoresSafeArea()
+                .accessibilityHidden(true)
         }
     }
 
@@ -77,21 +80,29 @@ struct MainTabView: View {
         Button {
             let impactFeedback = UIImpactFeedbackGenerator(style: .light)
             impactFeedback.impactOccurred()
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            if reduceMotion {
                 selectedTab = tab
+            } else {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    selectedTab = tab
+                }
             }
         } label: {
             VStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(.system(size: 22))
                     .symbolEffect(.bounce, value: selectedTab == tab)
+                    .accessibilityHidden(true)
 
                 Text(label)
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.caption2)
+                    .fontWeight(.medium)
             }
             .foregroundStyle(selectedTab == tab ? AnyShapeStyle(MirrorTheme.gradientPrimary) : AnyShapeStyle(Color.gray.opacity(0.6)))
             .frame(maxWidth: .infinity)
         }
+        .accessibilityLabel(label)
+        .accessibilityAddTraits(selectedTab == tab ? [.isSelected, .isButton] : .isButton)
     }
 
     private var createButton: some View {
@@ -113,6 +124,8 @@ struct MainTabView: View {
             .offset(y: -16)
         }
         .frame(maxWidth: .infinity)
+        .accessibilityLabel(L10n.a11yCreateButton)
+        .accessibilityAddTraits(.isButton)
     }
 
     // MARK: - Create Action Sheet
@@ -120,26 +133,29 @@ struct MainTabView: View {
     private var createActionSheet: some View {
         NavigationStack {
             VStack(spacing: 20) {
-                Text("Create")
-                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                Text(L10n.createTitle)
+                    .font(.title)
+                    .fontWeight(.bold)
+                    .fontDesign(.rounded)
                     .foregroundStyle(MirrorTheme.gradientPrimary)
                     .padding(.top, 8)
+                    .accessibilityAddTraits(.isHeader)
 
                 VStack(spacing: 12) {
-                    createOption(icon: "sparkles", title: "Generate Outfit", subtitle: "AI-powered outfit suggestion", color: MirrorTheme.purple) {
+                    createOption(icon: "sparkles", title: L10n.createGenerateOutfit, subtitle: L10n.createGenerateOutfitSubtitle, color: MirrorTheme.purple) {
                         showCreateSheet = false
                     }
 
-                    createOption(icon: "camera.fill", title: "Add to Wardrobe", subtitle: "Photograph a clothing item", color: MirrorTheme.pink) {
+                    createOption(icon: "camera.fill", title: L10n.createAddToWardrobe, subtitle: L10n.createAddToWardrobeSubtitle, color: MirrorTheme.pink) {
                         showCreateSheet = false
                         selectedTab = .wardrobe
                     }
 
-                    createOption(icon: "person.fill.viewfinder", title: "Virtual Try-On", subtitle: "See clothes on your avatar", color: MirrorTheme.indigo) {
+                    createOption(icon: "person.fill.viewfinder", title: L10n.createVirtualTryOn, subtitle: L10n.createVirtualTryOnSubtitle, color: MirrorTheme.indigo) {
                         showCreateSheet = false
                     }
 
-                    createOption(icon: "square.and.arrow.up", title: "Share Outfit", subtitle: "Post your look to the feed", color: Color(hex: "10B981")) {
+                    createOption(icon: "square.and.arrow.up", title: L10n.createShareOutfit, subtitle: L10n.createShareOutfitSubtitle, color: Color(hex: "10B981")) {
                         showCreateSheet = false
                     }
                 }
@@ -167,14 +183,16 @@ struct MainTabView: View {
                         .font(.system(size: 22))
                         .foregroundStyle(color)
                 }
+                .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.callout)
+                        .fontWeight(.semibold)
                         .foregroundStyle(.primary)
 
                     Text(subtitle)
-                        .font(.system(size: 13))
+                        .font(.caption)
                         .foregroundStyle(.secondary)
                 }
 
@@ -183,6 +201,7 @@ struct MainTabView: View {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
             }
             .padding(16)
             .background(
@@ -190,6 +209,8 @@ struct MainTabView: View {
                     .fill(Color(UIColor.secondarySystemBackground))
             )
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
     }
 
 }

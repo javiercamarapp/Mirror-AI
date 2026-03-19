@@ -313,4 +313,5 @@ export interface ApiResponse<T> {
 export type AppVariables = {
   userId: string;
   subscriptionPlan?: SubscriptionPlan;
+  requestId?: string;
 };

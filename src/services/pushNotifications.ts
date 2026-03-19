@@ -1,4 +1,5 @@
 import { supabaseAdmin } from './supabase.js';
+import { logger } from './logger.js';
 
 /**
  * Push notification payload.
@@ -36,7 +37,7 @@ async function sendAPNsNotification(payload: PushPayload): Promise<APNsResponse>
   const authKey = process.env.APNS_AUTH_KEY;
 
   if (!keyId || !teamId || !bundleId || !authKey) {
-    console.warn('[Push] APNs not configured — skipping push notification');
+    logger.warn('APNs not configured — skipping push notification');
     return { success: false, statusCode: 0, reason: 'APNs not configured' };
   }
 
@@ -85,7 +86,7 @@ async function sendAPNsNotification(payload: PushPayload): Promise<APNsResponse>
     return { success: false, statusCode: response.status, reason };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[Push] APNs request failed:', message);
+    logger.error({ err: message }, 'APNs request failed');
     return { success: false, statusCode: 0, reason: message };
   }
 }
@@ -189,9 +190,9 @@ function base64UrlEncode(input: string): string {
 async function removeInvalidToken(token: string): Promise<void> {
   try {
     await supabaseAdmin.from('device_tokens').delete().eq('token', token);
-    console.log('[Push] Removed invalid device token');
+    logger.info({ token }, 'Removed invalid device token');
   } catch (err) {
-    console.error('[Push] Failed to remove invalid token:', err);
+    logger.error({ err, token }, 'Failed to remove invalid device token');
   }
 }
 
@@ -249,11 +250,11 @@ export async function sendPushNotification(
     );
 
     if (failures.length > 0 && failures.length === results.length) {
-      console.warn(`[Push] All push notifications failed for user ${userId}`);
+      logger.warn({ userId }, 'All push notifications failed for user');
     }
   } catch (err) {
     // Push notifications should never break the app
-    console.error('[Push] Failed to send push notification:', err);
+    logger.error({ err, userId }, 'Failed to send push notification');
   }
 }
 
@@ -307,6 +308,6 @@ export async function sendPushNotificationToMany(
       )
     );
   } catch (err) {
-    console.error('[Push] Failed to send batch push notifications:', err);
+    logger.error({ err, userCount: userIds.length }, 'Failed to send batch push notifications');
   }
 }

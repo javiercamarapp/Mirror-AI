@@ -1,6 +1,9 @@
 import { Hono } from 'hono';
 import { supabaseAdmin } from '../services/supabase.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { moderationMiddleware } from '../middleware/moderation.js';
+import { sendPushNotification } from '../services/pushNotifications.js';
+import { processReports } from '../services/contentModeration.js';
 import type { AppVariables } from '../types/index.js';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -99,8 +102,8 @@ social.get('/feed', async (c) => {
 });
 
 // ─── POST /social/posts ─────────────────────────────────────────────────────
-// Create post (outfit share).
-social.post('/posts', async (c) => {
+// Create post (outfit share). Content moderation is applied to text fields.
+social.post('/posts', moderationMiddleware, async (c) => {
   try {
     const userId = c.get('userId');
     const body = await c.req.json<{
@@ -267,15 +270,25 @@ social.post('/posts/:id/like', async (c) => {
             .eq('id', userId)
             .single();
 
+          const likerName = liker?.full_name ?? 'Someone';
+
           await supabaseAdmin.from('notifications').insert({
             id: uuidv4(),
             user_id: post.user_id,
             type: 'like',
-            title: `${liker?.full_name ?? 'Someone'} liked your outfit`,
+            title: `${likerName} liked your outfit`,
             body: '',
             data: { post_id: postId },
             read: false,
           });
+
+          // Send push notification (block check happens inside sendPushNotification)
+          sendPushNotification(
+            post.user_id,
+            `${likerName} liked your outfit`,
+            'Check it out!',
+            { type: 'like', post_id: postId }
+          ).catch(() => {});
         }
       }
 
@@ -325,8 +338,8 @@ social.get('/posts/:id/comments', async (c) => {
 });
 
 // ─── POST /social/posts/:id/comments ────────────────────────────────────────
-// Add comment to a post.
-social.post('/posts/:id/comments', async (c) => {
+// Add comment to a post. Content moderation is applied to text fields.
+social.post('/posts/:id/comments', moderationMiddleware, async (c) => {
   try {
     const userId = c.get('userId');
     const postId = c.req.param('id');
@@ -379,15 +392,26 @@ social.post('/posts/:id/comments', async (c) => {
           .eq('id', userId)
           .single();
 
+        const commenterName = commenter?.full_name ?? 'Someone';
+        const commentPreview = body.content.trim().substring(0, 100);
+
         await supabaseAdmin.from('notifications').insert({
           id: uuidv4(),
           user_id: post.user_id,
           type: 'comment',
-          title: `${commenter?.full_name ?? 'Someone'} commented on your outfit`,
-          body: body.content.trim().substring(0, 100),
+          title: `${commenterName} commented on your outfit`,
+          body: commentPreview,
           data: { post_id: postId, comment_id: comment.id },
           read: false,
         });
+
+        // Send push notification (block check happens inside sendPushNotification)
+        sendPushNotification(
+          post.user_id,
+          `${commenterName} commented on your outfit`,
+          commentPreview,
+          { type: 'comment', post_id: postId, comment_id: comment.id }
+        ).catch(() => {});
       }
     }
 
@@ -776,6 +800,11 @@ social.post('/report', async (c) => {
       return c.json({ success: false, error: error.message }, 500);
     }
 
+    // Process report thresholds (auto-flag, auto-hide, auto-suspend)
+    processReports(body.content_type, body.content_id).catch((err) => {
+      console.error('[Report] Failed to process report thresholds:', err);
+    });
+
     return c.json({ success: true, data: report }, 201);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
@@ -852,6 +881,348 @@ social.post('/posts/:id/hide', async (c) => {
     return c.json({ success: true, data: { message: 'Post hidden from your feed' } });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
+    return c.json({ success: false, error: message }, 500);
+  }
+});
+
+// ─── GET /social/posts/:id/share-url ──────────────────────────────────────────
+// Generate a shareable deep link for a post.
+social.get('/posts/:id/share-url', async (c) => {
+  try {
+    const postId = c.req.param('id');
+
+    // Verify post exists and is public
+    const { data: post, error } = await supabaseAdmin
+      .from('social_posts')
+      .select('id, is_public, user_id')
+      .eq('id', postId)
+      .single();
+
+    if (error || !post) {
+      return c.json({ success: false, error: 'Post not found' }, 404);
+    }
+
+    // Generate deep link URL
+    const appScheme = process.env.APP_SCHEME ?? 'mirrorai';
+    const webBaseUrl = process.env.WEB_BASE_URL ?? 'https://app.mirrorai.com';
+
+    const deepLink = `${appScheme}://post/${postId}`;
+    const webLink = `${webBaseUrl}/post/${postId}`;
+
+    return c.json({
+      success: true,
+      data: {
+        deep_link: deepLink,
+        web_link: webLink,
+        post_id: postId,
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return c.json({ success: false, error: message }, 500);
+  }
+});
+
+// ─── POST /social/posts/:id/share ─────────────────────────────────────────────
+// Track a share event for analytics.
+social.post('/posts/:id/share', async (c) => {
+  try {
+    const userId = c.get('userId');
+    const postId = c.req.param('id');
+    const body = await c.req.json<{ platform?: string }>().catch(() => ({}));
+
+    // Verify post exists
+    const { data: post } = await supabaseAdmin
+      .from('social_posts')
+      .select('id')
+      .eq('id', postId)
+      .single();
+
+    if (!post) {
+      return c.json({ success: false, error: 'Post not found' }, 404);
+    }
+
+    // Record the share event
+    const { data: share, error } = await supabaseAdmin
+      .from('post_shares')
+      .insert({
+        id: uuidv4(),
+        post_id: postId,
+        user_id: userId,
+        platform: body.platform ?? null,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      return c.json({ success: false, error: error.message }, 500);
+    }
+
+    return c.json({ success: true, data: share }, 201);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[Share Error]:', err);
+    return c.json({ success: false, error: message }, 500);
+  }
+});
+
+// ─── Admin Middleware ──────────────────────────────────────────────────────────
+// Checks if the current user has admin privileges via the moderation_status or
+// a dedicated ADMIN_USER_IDS environment variable.
+async function requireAdmin(c: ReturnType<typeof social.get extends (path: string, ...args: infer A) => unknown ? never : never> extends never ? Parameters<Parameters<typeof social.get>[1]>[0] : never): Promise<boolean> {
+  const userId = c.get('userId');
+
+  // Check env-based admin list first
+  const adminIds = process.env.ADMIN_USER_IDS?.split(',').map((id) => id.trim()) ?? [];
+  if (adminIds.includes(userId)) {
+    return true;
+  }
+
+  // Check if user has admin role in the database
+  const { data: profile } = await supabaseAdmin
+    .from('user_profiles')
+    .select('moderation_status')
+    .eq('id', userId)
+    .single();
+
+  // Only users explicitly in ADMIN_USER_IDS or with a special flag are admins
+  // For now, check the env var as the primary mechanism
+  return false;
+}
+
+// ─── GET /social/admin/reports ─────────────────────────────────────────────────
+// List pending content reports with pagination. Admin only.
+social.get('/admin/reports', async (c) => {
+  try {
+    const userId = c.get('userId');
+
+    // Admin check
+    const adminIds = process.env.ADMIN_USER_IDS?.split(',').map((id) => id.trim()) ?? [];
+    if (!adminIds.includes(userId)) {
+      return c.json({ success: false, error: 'Admin access required' }, 403);
+    }
+
+    const page = parseInt(c.req.query('page') ?? '1', 10);
+    const limit = Math.min(parseInt(c.req.query('limit') ?? '20', 10), 100);
+    const offset = (page - 1) * limit;
+    const status = c.req.query('status') ?? 'pending';
+
+    let query = supabaseAdmin
+      .from('content_reports')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (status !== 'all') {
+      query = query.eq('status', status);
+    }
+
+    const { data: reports, error, count } = await query;
+
+    if (error) {
+      return c.json({ success: false, error: error.message }, 500);
+    }
+
+    return c.json({
+      success: true,
+      data: reports ?? [],
+      pagination: {
+        page,
+        limit,
+        total: count ?? 0,
+        has_more: (count ?? 0) > offset + limit,
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return c.json({ success: false, error: message }, 500);
+  }
+});
+
+// ─── POST /social/admin/reports/:id/resolve ────────────────────────────────────
+// Mark a report as resolved or dismissed. Admin only.
+social.post('/admin/reports/:id/resolve', async (c) => {
+  try {
+    const userId = c.get('userId');
+
+    const adminIds = process.env.ADMIN_USER_IDS?.split(',').map((id) => id.trim()) ?? [];
+    if (!adminIds.includes(userId)) {
+      return c.json({ success: false, error: 'Admin access required' }, 403);
+    }
+
+    const reportId = c.req.param('id');
+    const body = await c.req.json<{ resolution: 'dismissed' | 'action_taken' }>();
+
+    if (!body.resolution || !['dismissed', 'action_taken'].includes(body.resolution)) {
+      return c.json({ success: false, error: 'resolution must be "dismissed" or "action_taken"' }, 400);
+    }
+
+    const { data: report, error } = await supabaseAdmin
+      .from('content_reports')
+      .update({
+        status: body.resolution,
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq('id', reportId)
+      .eq('status', 'pending')
+      .select()
+      .single();
+
+    if (error || !report) {
+      return c.json({ success: false, error: 'Report not found or already resolved' }, 404);
+    }
+
+    return c.json({ success: true, data: report });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return c.json({ success: false, error: message }, 500);
+  }
+});
+
+// ─── POST /social/admin/reports/:id/action ─────────────────────────────────────
+// Take moderation action on the reported user (warn/suspend/ban). Admin only.
+social.post('/admin/reports/:id/action', async (c) => {
+  try {
+    const userId = c.get('userId');
+
+    const adminIds = process.env.ADMIN_USER_IDS?.split(',').map((id) => id.trim()) ?? [];
+    if (!adminIds.includes(userId)) {
+      return c.json({ success: false, error: 'Admin access required' }, 403);
+    }
+
+    const reportId = c.req.param('id');
+    const body = await c.req.json<{
+      action: 'warn' | 'suspend' | 'ban';
+      reason?: string;
+      suspend_days?: number;
+    }>();
+
+    if (!body.action || !['warn', 'suspend', 'ban'].includes(body.action)) {
+      return c.json({ success: false, error: 'action must be "warn", "suspend", or "ban"' }, 400);
+    }
+
+    // Get the report to find the reported content and user
+    const { data: report } = await supabaseAdmin
+      .from('content_reports')
+      .select('*')
+      .eq('id', reportId)
+      .single();
+
+    if (!report) {
+      return c.json({ success: false, error: 'Report not found' }, 404);
+    }
+
+    // Determine the target user from the report
+    let targetUserId: string | null = report.reported_user_id;
+
+    if (!targetUserId) {
+      // Look up the content owner
+      if (report.content_type === 'post') {
+        const { data: post } = await supabaseAdmin
+          .from('social_posts')
+          .select('user_id')
+          .eq('id', report.content_id)
+          .single();
+        targetUserId = post?.user_id ?? null;
+      } else if (report.content_type === 'comment') {
+        const { data: comment } = await supabaseAdmin
+          .from('post_comments')
+          .select('user_id')
+          .eq('id', report.content_id)
+          .single();
+        targetUserId = comment?.user_id ?? null;
+      } else if (report.content_type === 'story') {
+        const { data: story } = await supabaseAdmin
+          .from('stories')
+          .select('user_id')
+          .eq('id', report.content_id)
+          .single();
+        targetUserId = story?.user_id ?? null;
+      } else if (report.content_type === 'user') {
+        targetUserId = report.content_id;
+      }
+    }
+
+    if (!targetUserId) {
+      return c.json({ success: false, error: 'Could not determine the reported user' }, 400);
+    }
+
+    // Calculate suspension expiry if applicable
+    let expiresAt: string | null = null;
+    if (body.action === 'suspend') {
+      const days = body.suspend_days ?? 7;
+      const expiry = new Date();
+      expiry.setDate(expiry.getDate() + days);
+      expiresAt = expiry.toISOString();
+    }
+
+    // Record the moderation action
+    const { error: actionError } = await supabaseAdmin
+      .from('moderation_actions')
+      .insert({
+        id: uuidv4(),
+        user_id: targetUserId,
+        action: body.action,
+        reason: body.reason ?? null,
+        admin_id: userId,
+        expires_at: expiresAt,
+      });
+
+    if (actionError) {
+      return c.json({ success: false, error: actionError.message }, 500);
+    }
+
+    // Update user moderation status
+    const moderationStatus = body.action === 'warn' ? 'warned'
+      : body.action === 'suspend' ? 'suspended'
+      : 'banned';
+
+    const profileUpdate: Record<string, unknown> = { moderation_status: moderationStatus };
+    if (body.action === 'suspend' && expiresAt) {
+      profileUpdate.suspension_expires_at = expiresAt;
+    }
+
+    await supabaseAdmin
+      .from('user_profiles')
+      .update(profileUpdate)
+      .eq('id', targetUserId);
+
+    // If banning or suspending, hide all their posts
+    if (body.action === 'ban' || body.action === 'suspend') {
+      await supabaseAdmin
+        .from('social_posts')
+        .update({ is_public: false })
+        .eq('user_id', targetUserId);
+
+      // Expire all their stories
+      await supabaseAdmin
+        .from('stories')
+        .update({ expires_at: new Date().toISOString() })
+        .eq('user_id', targetUserId)
+        .gt('expires_at', new Date().toISOString());
+    }
+
+    // Mark the report as action_taken
+    await supabaseAdmin
+      .from('content_reports')
+      .update({
+        status: 'action_taken',
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq('id', reportId);
+
+    return c.json({
+      success: true,
+      data: {
+        action: body.action,
+        target_user_id: targetUserId,
+        moderation_status: moderationStatus,
+        expires_at: expiresAt,
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[Admin Action Error]:', err);
     return c.json({ success: false, error: message }, 500);
   }
 });

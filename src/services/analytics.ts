@@ -1,5 +1,6 @@
 import { supabaseAdmin } from './supabase.js';
 import { v4 as uuidv4 } from 'uuid';
+import { logger } from './logger.js';
 
 /**
  * Simple analytics event tracker.
@@ -19,7 +20,7 @@ export async function trackEvent(
     });
   } catch (err) {
     // Analytics should never break the app — log and move on
-    console.error('[Analytics] Failed to track event:', event, err);
+    logger.error({ err, event }, 'Failed to track analytics event');
   }
 }
 

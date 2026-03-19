@@ -253,6 +253,14 @@ friends.post('/accept/:id', async (c) => {
       read: false,
     });
 
+    // Send push notification to the requester
+    sendPushNotification(
+      data.requester_id,
+      `${accepter?.full_name ?? 'Someone'} accepted your friend request`,
+      'You can now share outfits and view each other\'s wardrobes',
+      { type: 'friend_accepted', friendship_id: data.id }
+    ).catch(() => {});
+
     return c.json({ success: true, data });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
@@ -506,6 +514,62 @@ friends.get('/:id/outfits', async (c) => {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
+    return c.json({ success: false, error: message }, 500);
+  }
+});
+
+// ─── POST /friends/unblock/:userId ─────────────────────────────────────────
+// Unblock a user. Only the user who initiated the block can unblock.
+friends.post('/unblock/:userId', async (c) => {
+  try {
+    const userId = c.get('userId');
+    const blockedUserId = c.req.param('userId');
+
+    if (!blockedUserId) {
+      return c.json({ success: false, error: 'userId parameter is required' }, 400);
+    }
+
+    if (blockedUserId === userId) {
+      return c.json({ success: false, error: 'Invalid user ID' }, 400);
+    }
+
+    // Find the blocked friendship record where the current user is the blocker.
+    // In the block flow (POST /social/block), the blocker is stored as requester_id.
+    const { data: blocked, error: findError } = await supabaseAdmin
+      .from('friendships')
+      .select('id, requester_id')
+      .eq('status', 'blocked')
+      .eq('requester_id', userId)
+      .eq('addressee_id', blockedUserId)
+      .maybeSingle();
+
+    if (findError) {
+      return c.json({ success: false, error: findError.message }, 500);
+    }
+
+    if (!blocked) {
+      return c.json({ success: false, error: 'Block record not found or you are not the blocker' }, 404);
+    }
+
+    // Validate that the current user is indeed the blocker (requester_id)
+    if (blocked.requester_id !== userId) {
+      return c.json({ success: false, error: 'Only the user who blocked can unblock' }, 403);
+    }
+
+    // Remove the blocked friendship record
+    const { error: deleteError } = await supabaseAdmin
+      .from('friendships')
+      .delete()
+      .eq('id', blocked.id);
+
+    if (deleteError) {
+      return c.json({ success: false, error: deleteError.message }, 500);
+    }
+
+    return c.json({ success: true, data: { message: 'User unblocked successfully' } });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[Unblock Error]:', err);
     return c.json({ success: false, error: message }, 500);
   }
 });

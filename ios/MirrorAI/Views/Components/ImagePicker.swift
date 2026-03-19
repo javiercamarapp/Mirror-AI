@@ -36,10 +36,18 @@ struct ImagePicker: UIViewControllerRepresentable {
             _ picker: UIImagePickerController,
             didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
         ) {
+            let rawImage: UIImage?
             if let editedImage = info[.editedImage] as? UIImage {
-                parent.image = editedImage
+                rawImage = editedImage
             } else if let originalImage = info[.originalImage] as? UIImage {
-                parent.image = originalImage
+                rawImage = originalImage
+            } else {
+                rawImage = nil
+            }
+
+            // Strip all EXIF metadata (especially GPS location data) from picked images
+            if let image = rawImage {
+                parent.image = EXIFStripper.cleanImage(image)
             }
 
             parent.dismiss()

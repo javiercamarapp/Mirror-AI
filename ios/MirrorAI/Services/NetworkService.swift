@@ -57,7 +57,7 @@ actor NetworkService {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 120
-        self.session = URLSession(configuration: config)
+        self.session = URLSession.pinned(configuration: config)
 
         self.jsonEncoder = JSONEncoder()
         self.jsonEncoder.keyEncodingStrategy = .convertToSnakeCase

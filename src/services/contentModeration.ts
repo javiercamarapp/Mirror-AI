@@ -1,4 +1,5 @@
 import { supabaseAdmin } from './supabase.js';
+import { logger } from './logger.js';
 
 // ─── Profanity Blocklist ─────────────────────────────────────────────────────
 // Basic blocklist for content moderation. In production, consider using a
@@ -98,15 +99,16 @@ export async function processReports(
     } else if (total >= AUTO_FLAG_THRESHOLD) {
       // Auto-flag: update reports to 'reviewed' so admins notice them
       // (they stay visible but are flagged for priority review)
-      console.log(
-        `[Moderation] Content ${contentType}:${contentId} flagged with ${total} reports`
+      logger.info(
+        { contentType, contentId, reportCount: total },
+        `Content ${contentType}:${contentId} flagged with ${total} reports`
       );
     }
 
     // Check if the reported user should be auto-suspended
     await checkUserSuspension(contentType, contentId);
   } catch (err) {
-    console.error('[Moderation] Failed to process reports:', err);
+    logger.error({ err, contentType, contentId }, 'Failed to process moderation reports');
   }
 }
 
@@ -218,8 +220,9 @@ async function checkUserSuspension(
 
     if (totalReports >= AUTO_SUSPEND_THRESHOLD) {
       // Auto-suspend: hide all their posts and mark profile as suspended
-      console.log(
-        `[Moderation] Auto-suspending user ${reportedUserId} with ${totalReports} total reports`
+      logger.warn(
+        { userId: reportedUserId, totalReports },
+        `Auto-suspending user ${reportedUserId} with ${totalReports} total reports`
       );
 
       // Hide all their posts
@@ -236,6 +239,6 @@ async function checkUserSuspension(
         .gt('expires_at', new Date().toISOString());
     }
   } catch (err) {
-    console.error('[Moderation] Failed to check user suspension:', err);
+    logger.error({ err, contentType, contentId }, 'Failed to check user suspension');
   }
 }

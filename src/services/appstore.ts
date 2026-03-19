@@ -7,6 +7,7 @@
 
 import * as jose from 'jose';
 import crypto from 'node:crypto';
+import { logger } from './logger.js';
 
 const EXPECTED_BUNDLE_ID = 'com.mirrorai.app';
 
@@ -135,7 +136,7 @@ export async function verifyTransaction(signedTransaction: string): Promise<Veri
     const protectedHeader = jose.decodeProtectedHeader(signedTransaction);
 
     if (!protectedHeader.x5c || protectedHeader.x5c.length === 0) {
-      console.error('[App Store Verify] Missing x5c certificate chain');
+      logger.error('App Store Verify: Missing x5c certificate chain');
       return invalid;
     }
 
@@ -152,13 +153,13 @@ export async function verifyTransaction(signedTransaction: string): Promise<Veri
 
     // Step 4: Validate bundle ID
     if (claims.bundleId !== EXPECTED_BUNDLE_ID) {
-      console.error(`[App Store Verify] Bundle ID mismatch: got "${claims.bundleId}", expected "${EXPECTED_BUNDLE_ID}"`);
+      logger.error({ got: claims.bundleId, expected: EXPECTED_BUNDLE_ID }, 'App Store Verify: Bundle ID mismatch');
       return invalid;
     }
 
     // Step 5: Validate environment
     if (claims.environment && !ALLOWED_ENVIRONMENTS.has(claims.environment as string)) {
-      console.error(`[App Store Verify] Invalid environment: "${claims.environment}"`);
+      logger.error({ environment: claims.environment }, 'App Store Verify: Invalid environment');
       return invalid;
     }
 
@@ -167,7 +168,7 @@ export async function verifyTransaction(signedTransaction: string): Promise<Veri
       const signedDate = new Date(claims.signedDate as number);
       const now = Date.now();
       if (Math.abs(now - signedDate.getTime()) > MAX_CLOCK_SKEW_MS) {
-        console.error(`[App Store Verify] Signed date out of acceptable range: ${signedDate.toISOString()}`);
+        logger.error({ signedDate: signedDate.toISOString() }, 'App Store Verify: Signed date out of acceptable range');
         return invalid;
       }
     }
@@ -184,7 +185,7 @@ export async function verifyTransaction(signedTransaction: string): Promise<Veri
         : null,
     };
   } catch (err) {
-    console.error('[App Store Verify] Transaction verification failed:', err);
+    logger.error({ err }, 'App Store Verify: Transaction verification failed');
     return invalid;
   }
 }
@@ -210,7 +211,7 @@ export async function verifySignedPayload(signedPayload: string): Promise<{
     const protectedHeader = jose.decodeProtectedHeader(signedPayload);
 
     if (!protectedHeader.x5c || protectedHeader.x5c.length === 0) {
-      console.error('[App Store Webhook] Missing x5c certificate chain');
+      logger.error('App Store Webhook: Missing x5c certificate chain');
       return null;
     }
 
@@ -223,7 +224,7 @@ export async function verifySignedPayload(signedPayload: string): Promise<{
     const claims = payload as Record<string, unknown>;
 
     if (!claims.notificationType) {
-      console.error('[App Store Webhook] Missing notificationType in payload');
+      logger.error('App Store Webhook: Missing notificationType in payload');
       return null;
     }
 
@@ -238,7 +239,7 @@ export async function verifySignedPayload(signedPayload: string): Promise<{
       } | undefined,
     };
   } catch (err) {
-    console.error('[App Store Webhook] Signed payload verification failed:', err);
+    logger.error({ err }, 'App Store Webhook: Signed payload verification failed');
     return null;
   }
 }
