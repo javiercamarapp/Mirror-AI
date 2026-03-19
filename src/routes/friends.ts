@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { supabaseAdmin } from '../services/supabase.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { sendPushNotification } from '../services/pushNotifications.js';
 import type { AppVariables } from '../types/index.js';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -156,6 +157,14 @@ friends.post('/request', async (c) => {
       data: { friendship_id: request.id, requester_id: userId },
       read: false,
     });
+
+    // Send push notification to the target user
+    sendPushNotification(
+      targetId,
+      `${requester?.full_name ?? 'Someone'} sent you a friend request`,
+      'Accept to share outfits and see each other\'s wardrobes',
+      { type: 'friend_request', friendship_id: request.id, requester_id: userId }
+    ).catch(() => {});
 
     return c.json({ success: true, data: request }, 201);
   } catch (err) {

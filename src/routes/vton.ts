@@ -81,18 +81,13 @@ vton.post('/generate', async (c) => {
       console.error('Failed to persist VTON result to storage, using original URL:', storageErr);
     }
 
-    // Decrement credit (optimistic lock to prevent race condition)
-    const { data: updatedProfile, error: creditError } = await supabaseAdmin
-      .from('user_profiles')
-      .update({ vton_credits: (profile.vton_credits ?? 1) - 1 })
-      .eq('id', userId)
-      .eq('vton_credits', profile.vton_credits) // Optimistic lock
-      .select('vton_credits')
-      .single();
-    if (!updatedProfile) {
-      return c.json({ success: false, error: 'Credit update conflict, please retry' }, 409);
+    // Decrement credit atomically using database function to prevent race conditions
+    const { data: decrementResult, error: creditError } = await supabaseAdmin
+      .rpc('decrement_credits', { p_user_id: userId, p_amount: 1 });
+    if (creditError || decrementResult === null || decrementResult < 0) {
+      return c.json({ success: false, error: 'Failed to decrement credits. Please retry.' }, 409);
     }
-    const newCredits = updatedProfile.vton_credits;
+    const newCredits = decrementResult;
 
     // Log usage in history
     await supabaseAdmin.from('vton_usage').insert({

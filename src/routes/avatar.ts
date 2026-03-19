@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { supabaseAdmin } from '../services/supabase.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { requireSubscription } from '../middleware/subscription.js';
 import { uploadImage, deleteImage, extractPathFromUrl } from '../services/storage.js';
 import { tryOn } from '../services/fashn.js';
 import { generateImage } from '../services/flux.js';
@@ -15,7 +16,8 @@ avatar.use('*', authMiddleware);
 
 // ─── POST /avatar/generate ────────────────────────────────────────────────────
 // Generate a stylized full-body avatar from a selfie using Gemini + Flux.
-avatar.post('/generate', async (c) => {
+// Requires at least a basic subscription.
+avatar.post('/generate', requireSubscription('basic'), async (c) => {
   try {
     const userId = c.get('userId');
     const body = await c.req.json<{
@@ -300,18 +302,13 @@ avatar.post('/try-outfit', async (c) => {
       console.error('Failed to persist try-outfit result to storage:', storageErr);
     }
 
-    // Decrement vton_credits (optimistic lock to prevent race condition)
-    const { data: updatedProfile } = await supabaseAdmin
-      .from('user_profiles')
-      .update({ vton_credits: (profile.vton_credits ?? 1) - 1 })
-      .eq('id', userId)
-      .eq('vton_credits', profile.vton_credits) // Optimistic lock
-      .select('vton_credits')
-      .single();
-    if (!updatedProfile) {
-      return c.json({ success: false, error: 'Credit update conflict, please retry' }, 409);
+    // Decrement vton_credits atomically using database function to prevent race conditions
+    const { data: decrementResult, error: decrementError } = await supabaseAdmin
+      .rpc('decrement_credits', { p_user_id: userId, p_amount: 1 });
+    if (decrementError || decrementResult === null || decrementResult < 0) {
+      return c.json({ success: false, error: 'Failed to decrement credits. Please retry.' }, 409);
     }
-    const newCredits = updatedProfile.vton_credits;
+    const newCredits = decrementResult;
 
     // Cache in avatar_renders table
     const renderId = uuidv4();

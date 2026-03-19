@@ -1,0 +1,310 @@
+/* Localizable.strings - Mirror AI */
+
+// MARK: - Common
+"common.ok" = "OK";
+"common.cancel" = "Cancel";
+"common.done" = "Done";
+"common.save" = "Save";
+"common.close" = "Close";
+"common.delete" = "Delete";
+"common.retry" = "Retry";
+"common.next" = "Next";
+"common.back" = "Back";
+"common.error" = "Error";
+"common.loading" = "Loading...";
+"common.search" = "Search";
+
+// MARK: - Tab Bar
+"tab.home" = "Home";
+"tab.wardrobe" = "Wardrobe";
+"tab.create" = "Create";
+"tab.social" = "Social";
+"tab.profile" = "Profile";
+
+// MARK: - Home
+"home.greeting.morning" = "Good morning! Ready to slay?";
+"home.greeting.afternoon" = "Looking good this afternoon!";
+"home.greeting.evening" = "Evening vibes loading...";
+"home.greeting.night" = "Night owl fashion mode";
+"home.avatar.title" = "Your Avatar";
+"home.avatar.subtitle" = "Tap to customize your look";
+"home.avatar.aiGenerated" = "AI-generated";
+"home.todaysLook" = "Today's Look";
+"home.generateLook" = "Generate Today's Look";
+"home.viewDetails" = "View Details";
+"home.dayStreak" = "day streak";
+"home.keepLogging" = "Keep logging daily outfits!";
+"home.best" = "Best";
+"home.addClothes" = "Add Clothes";
+"home.tryOn" = "Try On";
+"home.aiChat" = "AI Chat";
+"home.unlockPotential" = "Unlock Full Potential";
+"home.unlockSubtitle" = "Avatar, unlimited VTON, AI styling & more";
+"home.pro" = "PRO";
+
+// MARK: - Auth
+"auth.appName" = "Mirror AI";
+"auth.tagline" = "Your AI Fashion Companion";
+"auth.feature.styling" = "AI-Powered Styling";
+"auth.feature.tryOn" = "Virtual Try-On";
+"auth.feature.score" = "Track Your Style Score";
+"auth.continueGoogle" = "Continue with Google";
+"auth.continueEmail" = "Continue with Email";
+"auth.termsPrefix" = "By continuing, you agree to our";
+"auth.termsOfService" = "Terms of Service";
+"auth.privacyPolicy" = "Privacy Policy";
+"auth.and" = "and";
+"auth.sendMagicLink" = "Send Magic Link";
+"auth.signInEmail" = "Sign in with Email";
+"auth.magicLinkDescription" = "We'll send you a magic link to sign in — no password needed.";
+"auth.checkEmail" = "Check Your Email";
+"auth.emailPlaceholder" = "your@email.com";
+
+// MARK: - Onboarding
+"onboarding.ageTitle" = "How old are you?";
+"onboarding.ageSubtitle" = "We need to verify your age to continue";
+"onboarding.age18Plus" = "18 or older";
+"onboarding.age13to17" = "13-17";
+"onboarding.ageUnder13" = "Under 13";
+"onboarding.under13Message" = "Sorry, Mirror AI is not available for users under 13.";
+"onboarding.coppaNote" = "This is required by law (COPPA) to protect children's privacy.";
+"onboarding.parentalConsent" = "Parental Consent Required";
+"onboarding.parentalConsentNote" = "By continuing, you confirm that a parent or guardian has given consent for you to use Mirror AI.";
+"onboarding.welcomeTitle" = "Welcome to Mirror AI";
+"onboarding.welcomeSubtitle" = "Let's personalize your experience.\nWhat should we call you?";
+"onboarding.yourName" = "Your name";
+"onboarding.genderTitle" = "How do you identify?";
+"onboarding.genderSubtitle" = "This helps us curate better recommendations";
+"onboarding.bodyTitle" = "Body Information";
+"onboarding.bodySubtitle" = "Used for accurate try-on and fit recommendations";
+"onboarding.height" = "Height";
+"onboarding.bodyShape" = "Body Shape";
+"onboarding.styleDNA" = "Your Style DNA";
+"onboarding.styleSubtitle" = "Select all that resonate with you";
+"onboarding.colorAnalysis" = "Color Analysis";
+"onboarding.selfieSubtitle" = "Take a selfie to discover your color season\nand get personalized color recommendations";
+"onboarding.takeSelfie" = "Take a Selfie";
+"onboarding.retake" = "Retake";
+"onboarding.skipForNow" = "Skip for now";
+"onboarding.getStarted" = "Get Started";
+"onboarding.settingUp" = "Setting up your profile...";
+
+// MARK: - Wardrobe
+"wardrobe.title" = "Wardrobe";
+"wardrobe.searchPlaceholder" = "Search wardrobe...";
+"wardrobe.items" = "%d items";
+"wardrobe.emptyTitle" = "Your Wardrobe is Empty";
+"wardrobe.emptyDescription" = "Add your first clothing item to get started with AI styling";
+"wardrobe.addFirstItem" = "Add First Item";
+"wardrobe.addItem" = "Add Item";
+"wardrobe.loading" = "Loading wardrobe...";
+"wardrobe.all" = "All";
+
+// MARK: - Add Item
+"addItem.title" = "Add Item";
+"addItem.addPhoto" = "Add a Photo";
+"addItem.photoSubtitle" = "Take a photo or choose from library";
+"addItem.analyzing" = "Analyzing...";
+"addItem.identifyingDetails" = "Identifying garment details";
+"addItem.itemDetails" = "Item Details";
+"addItem.name" = "Name";
+"addItem.namePlaceholder" = "Item name";
+"addItem.category" = "Category";
+"addItem.color" = "Color";
+"addItem.colorPlaceholder" = "Color";
+"addItem.brand" = "Brand";
+"addItem.brandPlaceholder" = "Brand (optional)";
+"addItem.seasons" = "Seasons";
+"addItem.occasions" = "Occasions";
+"addItem.saveToWardrobe" = "Save to Wardrobe";
+"addItem.chooseSource" = "Choose Photo Source";
+"addItem.camera" = "Camera";
+"addItem.photoLibrary" = "Photo Library";
+
+// MARK: - Item Detail
+"itemDetail.wearCount" = "Wear Count";
+"itemDetail.timesWorn" = "times worn";
+"itemDetail.logWear" = "Log Wear";
+"itemDetail.editDetails" = "Edit Details";
+"itemDetail.saveChanges" = "Save Changes";
+"itemDetail.tryOn" = "Try On";
+"itemDetail.share" = "Share";
+"itemDetail.removeFromWardrobe" = "Remove from Wardrobe";
+"itemDetail.deleteItem" = "Delete Item";
+
+// MARK: - Daily Outfit
+"dailyOutfit.title" = "Daily Outfit";
+"dailyOutfit.readyToStyle" = "Ready to get styled?";
+"dailyOutfit.aiDescription" = "AI will create the perfect outfit\nfrom your wardrobe";
+"dailyOutfit.generate" = "Generate Outfit";
+"dailyOutfit.crafting" = "Crafting your look...";
+"dailyOutfit.analyzing" = "Analyzing your wardrobe, color palette,\nand style preferences";
+"dailyOutfit.styleScore" = "Style Score";
+"dailyOutfit.stylingTips" = "Styling Tips";
+"dailyOutfit.saveAsToday" = "Save as Today's Outfit";
+"dailyOutfit.new" = "New";
+"dailyOutfit.tryItOn" = "Try It On";
+
+// MARK: - AI Chat
+"aiChat.title" = "AI Stylist";
+"aiChat.welcomeTitle" = "Mirror AI Stylist";
+"aiChat.welcomeSubtitle" = "Ask me anything about fashion,\nstyling, and your wardrobe!";
+"aiChat.inputPlaceholder" = "Ask your stylist...";
+"aiChat.clearChat" = "Clear Chat";
+"aiChat.clearAllMessages" = "Clear All Messages";
+"aiChat.clearConfirmation" = "Are you sure you want to clear all messages? This cannot be undone.";
+"aiChat.errorMessage" = "Sorry, I had trouble processing that. Please try again.";
+
+// MARK: - Social Feed
+"feed.title" = "Feed";
+"feed.reportPost" = "Report Post";
+"feed.blockUser" = "Block User";
+"feed.blockConfirmation" = "You will no longer see posts from this user. They will not be notified.";
+"feed.reportTitle" = "Why are you reporting this post?";
+"feed.submitReport" = "Submit Report";
+"feed.submitting" = "Submitting...";
+"feed.likes" = "%d likes";
+"feed.like" = "%d like";
+"feed.viewComments" = "View all %d comments";
+"feed.viewComment" = "View all %d comment";
+
+// MARK: - Comments
+"comments.title" = "Comments";
+"comments.noComments" = "No Comments Yet";
+"comments.startConversation" = "Start the conversation";
+"comments.addComment" = "Add a comment...";
+"comments.reply" = "Reply";
+
+// MARK: - Stories
+"stories.yourStory" = "Your Story";
+
+// MARK: - Profile
+"profile.title" = "Profile";
+"profile.yourName" = "Your Name";
+"profile.editProfile" = "Edit Profile";
+"profile.yourPosts" = "Your Posts";
+"profile.noPosts" = "No posts yet";
+"profile.shareOutfits" = "Share your outfits with the community!";
+"profile.friends" = "Friends";
+"profile.notifications" = "Notifications";
+
+// MARK: - Edit Profile
+"editProfile.title" = "Edit Profile";
+"editProfile.changePhoto" = "Change Photo";
+"editProfile.displayName" = "Display Name";
+"editProfile.bodyPhoto" = "Body Photo";
+"editProfile.bodyPhotoDescription" = "Used for virtual try-on and avatar generation";
+"editProfile.tapToUpload" = "Tap to upload";
+"editProfile.gender" = "Gender";
+"editProfile.stylePreferences" = "Style Preferences";
+"editProfile.chooseSource" = "Choose Source";
+
+// MARK: - Settings
+"settings.title" = "Settings";
+"settings.account" = "Account";
+"settings.accountInfo" = "Account Info";
+"settings.subscription" = "Subscription";
+"settings.appPreferences" = "App Preferences";
+"settings.pushNotifications" = "Push Notifications";
+"settings.hapticFeedback" = "Haptic Feedback";
+"settings.darkMode" = "Dark Mode";
+"settings.support" = "Support";
+"settings.clearImageCache" = "Clear Image Cache";
+"settings.exportData" = "Export My Data";
+"settings.reportBug" = "Report a Bug";
+"settings.about" = "About";
+"settings.version" = "Version";
+"settings.logOut" = "Log Out";
+"settings.logOutConfirmation" = "Are you sure you want to log out?";
+"settings.deleteAccount" = "Delete Account";
+"settings.deleteAccountWarning" = "This will permanently delete your account, wardrobe, outfits, style data, social posts, and all associated content. This action cannot be undone.";
+"settings.confirmDeletion" = "Confirm Deletion";
+"settings.typeDelete" = "Type DELETE to confirm";
+"settings.permanentlyDelete" = "Permanently Delete";
+"settings.deletionFailed" = "Deletion Failed";
+"settings.deletingAccount" = "Deleting account...";
+
+// MARK: - Notifications
+"notifications.title" = "Notifications";
+"notifications.markAllRead" = "Mark All Read";
+"notifications.noNotifications" = "No Notifications";
+"notifications.allCaughtUp" = "You're all caught up! New notifications will appear here.";
+"notifications.today" = "Today";
+"notifications.earlier" = "Earlier";
+
+// MARK: - Subscription
+"subscription.title" = "Subscription";
+"subscription.choosePlan" = "Choose Your Plan";
+"subscription.unlockExperience" = "Unlock the full Mirror AI experience";
+"subscription.currentPlan" = "Current Plan";
+"subscription.subscribeTo" = "Subscribe to %@";
+"subscription.processing" = "Processing...";
+"subscription.restorePurchases" = "Restore Purchases";
+"subscription.perMonth" = "/month";
+
+// MARK: - Virtual Try-On
+"vton.title" = "Virtual Try-On";
+"vton.creditsRemaining" = "credits remaining";
+"vton.getMore" = "Get More";
+"vton.noItems" = "No Items";
+"vton.noItemsDescription" = "Add items to your wardrobe to try them on virtually.";
+"vton.tryOn" = "Try On";
+"vton.oneCredit" = "(1 credit)";
+"vton.generating" = "Generating your virtual try-on...";
+
+// MARK: - Create
+"create.title" = "Create";
+"create.generateOutfit" = "Generate Outfit";
+"create.generateOutfitSubtitle" = "AI-powered outfit suggestion";
+"create.addToWardrobe" = "Add to Wardrobe";
+"create.addToWardrobeSubtitle" = "Photograph a clothing item";
+"create.virtualTryOn" = "Virtual Try-On";
+"create.virtualTryOnSubtitle" = "See clothes on your avatar";
+"create.shareOutfit" = "Share Outfit";
+"create.shareOutfitSubtitle" = "Post your look to the feed";
+
+// MARK: - Offline
+"offline.noConnection" = "No internet connection";
+
+// MARK: - Content Loading
+"loading.style" = "Loading your style...";
+"loading.oops" = "Oops";
+
+// MARK: - Accessibility
+"a11y.notificationBell" = "Notifications";
+"a11y.notificationCount" = "%d unread notifications";
+"a11y.styleScore" = "Style score %@ points, %@ tier";
+"a11y.likeButton" = "Like";
+"a11y.liked" = "Liked";
+"a11y.unliked" = "Not liked";
+"a11y.commentButton" = "Comment";
+"a11y.shareButton" = "Share";
+"a11y.bookmarkButton" = "Bookmark";
+"a11y.moreOptions" = "More options";
+"a11y.closeButton" = "Close";
+"a11y.backButton" = "Go back";
+"a11y.addButton" = "Add new item";
+"a11y.createButton" = "Create new content";
+"a11y.favoriteButton" = "Toggle favorite";
+"a11y.favorited" = "Favorited";
+"a11y.notFavorited" = "Not favorited";
+"a11y.userAvatar" = "%@ avatar";
+"a11y.postImage" = "Post image";
+"a11y.outfitImage" = "Outfit image";
+"a11y.clothingImage" = "%@ clothing item image";
+"a11y.decorativeIcon" = "Decorative icon";
+"a11y.heightSlider" = "Height slider";
+"a11y.heightValue" = "%d centimeters";
+"a11y.sendMessage" = "Send message";
+"a11y.clearSearch" = "Clear search";
+"a11y.deleteChat" = "Delete chat history";
+"a11y.editProfile" = "Edit profile photo";
+"a11y.retakePhoto" = "Retake photo";
+"a11y.premiumBadge" = "Premium subscription badge";
+"a11y.streakFlame" = "Streak flame, %d day streak";
+"a11y.storyAvatar" = "%@ story, %@";
+"a11y.storyAvatarUnviewed" = "unviewed";
+"a11y.storyAvatarViewed" = "viewed";
+"a11y.progressBar" = "Story progress";
+"a11y.unreadIndicator" = "Unread";
+"a11y.doubleTapToLike" = "Double tap to like";

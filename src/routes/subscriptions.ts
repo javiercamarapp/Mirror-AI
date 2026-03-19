@@ -3,31 +3,43 @@ import { supabaseAdmin } from '../services/supabase.js';
 import { authMiddleware } from '../middleware/auth.js';
 import type { AppVariables } from '../types/index.js';
 import { v4 as uuidv4 } from 'uuid';
-import { verifyTransaction } from '../services/appstore.js';
+import { verifyTransaction, verifySignedPayload } from '../services/appstore.js';
 
 const subscriptions = new Hono<{ Variables: AppVariables }>();
 
 // ─── POST /subscriptions/webhooks/appstore ───────────────────────────────────
-// Apple App Store Server-to-Server notification webhook (no auth needed).
+// Apple App Store Server-to-Server notification v2 webhook (no auth needed).
+// The body contains a `signedPayload` JWS that must be cryptographically verified.
 subscriptions.post('/webhooks/appstore', async (c) => {
   try {
     const body = await c.req.json<{
-      notificationType: string;
-      signedTransactionInfo?: string;
+      signedPayload?: string;
     }>();
 
-    const { notificationType, signedTransactionInfo } = body;
-
-    if (!notificationType) {
-      return c.json({ success: false, error: 'Missing notificationType' }, 400);
+    // Step 1: Require the signedPayload field
+    if (!body.signedPayload) {
+      console.warn('[App Store Webhook] Rejected: missing signedPayload');
+      return c.json({ success: false, error: 'Missing signedPayload' }, 400);
     }
 
-    // Decode transaction info if provided
-    let transactionData: ReturnType<typeof verifyTransaction> | null = null;
-    if (signedTransactionInfo) {
-      transactionData = verifyTransaction(signedTransactionInfo);
+    // Step 2: Verify the JWS signature against Apple's certificate chain
+    const notification = await verifySignedPayload(body.signedPayload);
+    if (!notification) {
+      console.warn('[App Store Webhook] Rejected: signature verification failed');
+      return c.json({ success: false, error: 'Invalid webhook signature' }, 403);
+    }
+
+    const { notificationType, data: notificationData } = notification;
+
+    console.log(`[App Store Webhook] Verified notification: ${notificationType}`);
+
+    // Step 3: Verify the nested signedTransactionInfo if present
+    let transactionData: Awaited<ReturnType<typeof verifyTransaction>> | null = null;
+    if (notificationData?.signedTransactionInfo) {
+      transactionData = await verifyTransaction(notificationData.signedTransactionInfo);
       if (!transactionData.isValid) {
-        return c.json({ success: false, error: 'Invalid transaction' }, 400);
+        console.warn('[App Store Webhook] Rejected: nested transaction verification failed');
+        return c.json({ success: false, error: 'Invalid transaction in notification' }, 400);
       }
     }
 
@@ -196,7 +208,7 @@ subscriptions.post('/verify', async (c) => {
     }
 
     // Verify the signed transaction
-    const verification = verifyTransaction(body.receipt_data);
+    const verification = await verifyTransaction(body.receipt_data);
     if (!verification.isValid) {
       return c.json({ success: false, error: 'Transaction verification failed' }, 400);
     }
