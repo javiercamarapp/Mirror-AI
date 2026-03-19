@@ -1,4 +1,21 @@
 import { config } from '../config.js';
+import { fashnBreaker } from './circuit-breaker.js';
+import { logger } from './logger.js';
+
+const isProduction = config.nodeEnv === 'production';
+
+/**
+ * Sanitize error messages in production to avoid leaking internal details.
+ */
+function sanitizeError(error: unknown): Error {
+  if (!isProduction) {
+    return error instanceof Error ? error : new Error(String(error));
+  }
+  if (error instanceof Error && error.message.includes('Circuit breaker')) {
+    return new Error('Service temporarily unavailable. Please try again later.');
+  }
+  return new Error('An unexpected error occurred while processing your request.');
+}
 
 const BASE_URL = 'https://api.fashn.ai/v1';
 
@@ -48,42 +65,57 @@ export async function startTryOn(
   garmentImage: string,
   category: GarmentCategory
 ): Promise<string> {
-  const body: TryOnRequestBody = {
-    model_image: modelImage,
-    garment_image: garmentImage,
-    category,
-    mode: 'quality',
-    nsfw_filter: true,
-    cover_feet: false,
-    adjust_hands: true,
-    restore_background: true,
-    restore_clothes: true,
-    flat_lay: false,
-    long_top: false,
-  };
+  try {
+    return await fashnBreaker.execute(async () => {
+      const body: TryOnRequestBody = {
+        model_image: modelImage,
+        garment_image: garmentImage,
+        category,
+        mode: 'quality',
+        nsfw_filter: true,
+        cover_feet: false,
+        adjust_hands: true,
+        restore_background: true,
+        restore_clothes: true,
+        flat_lay: false,
+        long_top: false,
+      };
 
-  const response = await fetch(`${BASE_URL}/run`, {
-    method: 'POST',
-    headers: headers(),
-    body: JSON.stringify(body),
-  });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
 
-  if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(`Fashn /run failed (${response.status}): ${errorBody.slice(0, 300)}`);
+      try {
+        const response = await fetch(`${BASE_URL}/run`, {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          const errorBody = await response.text();
+          throw new Error(`Fashn /run failed (${response.status}): ${errorBody.slice(0, 300)}`);
+        }
+
+        const data: RunResponse = await response.json();
+
+        if (data.error) {
+          throw new Error(`Fashn /run error: ${data.error}`);
+        }
+
+        if (!data.id) {
+          throw new Error('Fashn /run returned no prediction ID');
+        }
+
+        return data.id;
+      } finally {
+        clearTimeout(timeout);
+      }
+    });
+  } catch (error) {
+    logger.error({ err: error instanceof Error ? error.message : String(error) }, 'Fashn startTryOn failed');
+    throw sanitizeError(error);
   }
-
-  const data: RunResponse = await response.json();
-
-  if (data.error) {
-    throw new Error(`Fashn /run error: ${data.error}`);
-  }
-
-  if (!data.id) {
-    throw new Error('Fashn /run returned no prediction ID');
-  }
-
-  return data.id;
 }
 
 /**
@@ -92,37 +124,52 @@ export async function startTryOn(
 export async function checkStatus(
   predictionId: string
 ): Promise<{ status: string; output?: string[]; error?: string }> {
-  const maxRetries = 2;
+  try {
+    return await fashnBreaker.execute(async () => {
+      const maxRetries = 2;
 
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    const response = await fetch(`${BASE_URL}/status/${predictionId}`, {
-      method: 'GET',
-      headers: headers(),
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000);
+
+        try {
+          const response = await fetch(`${BASE_URL}/status/${predictionId}`, {
+            method: 'GET',
+            headers: headers(),
+            signal: controller.signal,
+          });
+
+          if (response.status >= 500 && attempt < maxRetries) {
+            const delay = 1000 * Math.pow(2, attempt);
+            await new Promise((resolve) => setTimeout(resolve, delay));
+            continue;
+          }
+
+          if (!response.ok) {
+            const errorBody = await response.text();
+            throw new Error(
+              `Fashn /status failed (${response.status}): ${errorBody.slice(0, 300)}`
+            );
+          }
+
+          const data: StatusResponse = await response.json();
+
+          return {
+            status: data.status,
+            output: data.output,
+            error: data.error,
+          };
+        } finally {
+          clearTimeout(timeout);
+        }
+      }
+
+      throw new Error(`Fashn /status failed after ${maxRetries} retries for prediction ${predictionId}`);
     });
-
-    if (response.status >= 500 && attempt < maxRetries) {
-      const delay = 1000 * Math.pow(2, attempt);
-      await new Promise((resolve) => setTimeout(resolve, delay));
-      continue;
-    }
-
-    if (!response.ok) {
-      const errorBody = await response.text();
-      throw new Error(
-        `Fashn /status failed (${response.status}): ${errorBody.slice(0, 300)}`
-      );
-    }
-
-    const data: StatusResponse = await response.json();
-
-    return {
-      status: data.status,
-      output: data.output,
-      error: data.error,
-    };
+  } catch (error) {
+    logger.error({ err: error instanceof Error ? error.message : String(error), predictionId }, 'Fashn checkStatus failed');
+    throw sanitizeError(error);
   }
-
-  throw new Error(`Fashn /status failed after ${maxRetries} retries for prediction ${predictionId}`);
 }
 
 /**

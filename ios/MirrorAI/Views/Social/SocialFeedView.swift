@@ -85,6 +85,7 @@ struct SocialFeedView: View {
                             .onAppear {
                                 loadMore()
                             }
+                            .accessibilityLabel("Loading more posts")
                     }
                 }
                 .padding(.bottom, 100)
@@ -92,7 +93,7 @@ struct SocialFeedView: View {
             .background(Color(UIColor.systemBackground))
             .navigationTitle(L10n.feedTitle)
             .navigationBarTitleDisplayMode(.inline)
-            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+            .dynamicTypeSize(...DynamicTypeSize.accessibility1)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -104,6 +105,8 @@ struct SocialFeedView: View {
                             .font(.system(size: 20))
                             .foregroundStyle(MirrorTheme.gradientPrimary)
                     }
+                    .accessibilityLabel("Create new post")
+                    .accessibilityHint("Opens the post creator")
                 }
             }
             .refreshable {

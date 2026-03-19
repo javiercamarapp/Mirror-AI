@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 // MARK: - API Error
 
@@ -44,6 +45,7 @@ enum APIError: LocalizedError {
 
 actor NetworkService {
     static let shared = NetworkService()
+    private static let logger = Logger(subsystem: "com.mirrorai", category: "NetworkService")
 
     private var authToken: String?
     private let session: URLSession
@@ -362,6 +364,100 @@ actor NetworkService {
             return json["error"] as? String ?? json["message"] as? String
         }
         return String(data: data, encoding: .utf8)
+    }
+}
+
+// MARK: - Offline Data Cache
+
+/// Simple UserDefaults-based cache for offline access to recent feed posts and wardrobe items.
+final class OfflineDataCache: @unchecked Sendable {
+    static let shared = OfflineDataCache()
+    private static let logger = Logger(subsystem: "com.mirrorai", category: "OfflineDataCache")
+
+    private let defaults = UserDefaults.standard
+    private let encoder = JSONEncoder()
+    private let decoder = JSONDecoder()
+
+    private let feedPostsKey = "mirror_ai_cached_feed_posts"
+    private let wardrobeItemsKey = "mirror_ai_cached_wardrobe_items"
+    private let feedTimestampKey = "mirror_ai_cached_feed_ts"
+    private let wardrobeTimestampKey = "mirror_ai_cached_wardrobe_ts"
+
+    private init() {
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+    }
+
+    // MARK: - Feed Posts
+
+    func cacheFeedPosts(_ posts: [SocialPostModel]) {
+        do {
+            let data = try encoder.encode(posts)
+            defaults.set(data, forKey: feedPostsKey)
+            defaults.set(Date().timeIntervalSince1970, forKey: feedTimestampKey)
+            Self.logger.info("Cached \(posts.count) feed posts for offline access")
+        } catch {
+            Self.logger.error("Failed to cache feed posts: \(error.localizedDescription)")
+        }
+    }
+
+    func loadCachedFeedPosts() -> (posts: [SocialPostModel], isCached: Bool)? {
+        guard let data = defaults.data(forKey: feedPostsKey) else { return nil }
+        do {
+            let posts = try decoder.decode([SocialPostModel].self, from: data)
+            Self.logger.info("Loaded \(posts.count) cached feed posts")
+            return (posts, true)
+        } catch {
+            Self.logger.error("Failed to decode cached feed posts: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    var feedCacheAge: TimeInterval? {
+        let ts = defaults.double(forKey: feedTimestampKey)
+        guard ts > 0 else { return nil }
+        return Date().timeIntervalSince1970 - ts
+    }
+
+    // MARK: - Wardrobe Items
+
+    func cacheWardrobeItems(_ items: [WardrobeItemModel]) {
+        do {
+            let data = try encoder.encode(items)
+            defaults.set(data, forKey: wardrobeItemsKey)
+            defaults.set(Date().timeIntervalSince1970, forKey: wardrobeTimestampKey)
+            Self.logger.info("Cached \(items.count) wardrobe items for offline access")
+        } catch {
+            Self.logger.error("Failed to cache wardrobe items: \(error.localizedDescription)")
+        }
+    }
+
+    func loadCachedWardrobeItems() -> (items: [WardrobeItemModel], isCached: Bool)? {
+        guard let data = defaults.data(forKey: wardrobeItemsKey) else { return nil }
+        do {
+            let items = try decoder.decode([WardrobeItemModel].self, from: data)
+            Self.logger.info("Loaded \(items.count) cached wardrobe items")
+            return (items, true)
+        } catch {
+            Self.logger.error("Failed to decode cached wardrobe items: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    var wardrobeCacheAge: TimeInterval? {
+        let ts = defaults.double(forKey: wardrobeTimestampKey)
+        guard ts > 0 else { return nil }
+        return Date().timeIntervalSince1970 - ts
+    }
+
+    // MARK: - Clear
+
+    func clearAll() {
+        defaults.removeObject(forKey: feedPostsKey)
+        defaults.removeObject(forKey: wardrobeItemsKey)
+        defaults.removeObject(forKey: feedTimestampKey)
+        defaults.removeObject(forKey: wardrobeTimestampKey)
+        Self.logger.info("Cleared all offline caches")
     }
 }
 

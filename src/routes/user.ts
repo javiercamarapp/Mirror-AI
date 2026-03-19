@@ -389,6 +389,107 @@ user.post('/notifications/read-all', async (c) => {
   }
 });
 
+// ─── GET /user/notification-preferences ──────────────────────────────────────
+user.get('/notification-preferences', async (c) => {
+  try {
+    const userId = c.get('userId');
+
+    const { data, error } = await supabaseAdmin
+      .from('user_profiles')
+      .select('notification_preferences')
+      .eq('id', userId)
+      .single();
+
+    if (error || !data) {
+      return c.json({ success: false, error: 'Profile not found' }, 404);
+    }
+
+    // Return stored preferences or defaults
+    const defaults = {
+      likes: true,
+      comments: true,
+      friend_requests: true,
+      new_posts: true,
+    };
+
+    const preferences = data.notification_preferences
+      ? { ...defaults, ...(data.notification_preferences as Record<string, boolean>) }
+      : defaults;
+
+    return c.json({ success: true, data: preferences });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return c.json({ success: false, error: message }, 500);
+  }
+});
+
+// ─── PUT /user/notification-preferences ─────────────────────────────────────
+user.put('/notification-preferences', async (c) => {
+  try {
+    const userId = c.get('userId');
+    const body = await c.req.json<{
+      likes?: boolean;
+      comments?: boolean;
+      friend_requests?: boolean;
+      new_posts?: boolean;
+    }>();
+
+    // Validate: only allow known boolean preference keys
+    const allowedKeys = ['likes', 'comments', 'friend_requests', 'new_posts'];
+    const preferences: Record<string, boolean> = {};
+
+    for (const key of allowedKeys) {
+      if (key in body) {
+        const value = (body as Record<string, unknown>)[key];
+        if (typeof value !== 'boolean') {
+          return c.json(
+            { success: false, error: `Preference "${key}" must be a boolean` },
+            400
+          );
+        }
+        preferences[key] = value;
+      }
+    }
+
+    if (Object.keys(preferences).length === 0) {
+      return c.json(
+        { success: false, error: 'At least one preference must be provided (likes, comments, friend_requests, new_posts)' },
+        400
+      );
+    }
+
+    // Merge with existing preferences
+    const { data: existing } = await supabaseAdmin
+      .from('user_profiles')
+      .select('notification_preferences')
+      .eq('id', userId)
+      .single();
+
+    const defaults = { likes: true, comments: true, friend_requests: true, new_posts: true };
+    const merged = {
+      ...defaults,
+      ...((existing?.notification_preferences as Record<string, boolean>) ?? {}),
+      ...preferences,
+    };
+
+    const { data, error } = await supabaseAdmin
+      .from('user_profiles')
+      .update({ notification_preferences: merged })
+      .eq('id', userId)
+      .select('notification_preferences')
+      .single();
+
+    if (error) {
+      return c.json({ success: false, error: error.message }, 500);
+    }
+
+    return c.json({ success: true, data: data?.notification_preferences ?? merged });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return c.json({ success: false, error: message }, 500);
+  }
+});
+
 // ─── GET /user/export-data ─────────────────────────────────────────────────
 // Export all user data (GDPR/CCPA compliance).
 user.get('/export-data', async (c) => {

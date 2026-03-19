@@ -1,5 +1,6 @@
 import SwiftUI
 import Foundation
+import os
 
 @Observable
 @MainActor
@@ -51,13 +52,21 @@ class AppState {
     var isLoading = false
     var errorMessage: String?
 
+    // ─── Logging ────────────────────────────────────────────────────────
+    private static let logger = Logger(subsystem: "com.mirrorai", category: "AppState")
+
     // ─── Services ────────────────────────────────────────────────────────
     private let network = NetworkService.shared
     private let wardrobeService = WardrobeService.shared
     private let socialService = SocialService.shared
     private let aiService = AIService.shared
     private let vtonService = FashnService.shared
+    private let offlineCache = OfflineDataCache.shared
     private let tokenKey = "mirror_ai_auth_token"
+
+    // ─── Offline State ─────────────────────────────────────────────────
+    var isShowingCachedFeed = false
+    var isShowingCachedWardrobe = false
 
     // MARK: - Initialization
 
@@ -143,11 +152,13 @@ class AppState {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.httpBody = try JSONSerialization.data(withJSONObject: ["refresh_token": refreshToken])
 
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let pinnedSession = URLSession.pinned()
+            let (data, response) = try await pinnedSession.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse,
                   (200...299).contains(httpResponse.statusCode) else {
                 // Refresh failed - logout
+                Self.logger.error("Token refresh failed with status \((response as? HTTPURLResponse)?.statusCode ?? 0)")
                 logout()
                 return
             }
@@ -401,7 +412,15 @@ class AppState {
         do {
             let items = try await wardrobeService.getItems()
             wardrobeItems = items.map { $0.toModel() }
+            isShowingCachedWardrobe = false
+            offlineCache.cacheWardrobeItems(wardrobeItems)
         } catch {
+            // If network fails, show cached data
+            if wardrobeItems.isEmpty, let cached = offlineCache.loadCachedWardrobeItems() {
+                wardrobeItems = cached.items
+                isShowingCachedWardrobe = true
+                Self.logger.info("Showing cached wardrobe data (offline)")
+            }
             handleError(error, context: "loading wardrobe")
         }
     }
@@ -600,7 +619,18 @@ class AppState {
 
             feedPage = (append ? feedPage : 1) + (models.isEmpty ? 0 : 1)
             feedHasMore = !models.isEmpty
+            isShowingCachedFeed = false
+            // Cache first page of feed for offline access
+            if !append {
+                offlineCache.cacheFeedPosts(feedPosts)
+            }
         } catch {
+            // If network fails and we have no posts, show cached data
+            if feedPosts.isEmpty, let cached = offlineCache.loadCachedFeedPosts() {
+                feedPosts = cached.posts
+                isShowingCachedFeed = true
+                Self.logger.info("Showing cached feed data (offline)")
+            }
             handleError(error, context: "loading feed")
         }
     }
@@ -779,7 +809,7 @@ class AppState {
             message = error.localizedDescription
         }
         errorMessage = "Error \(context): \(message)"
-        print("[AppState] Error \(context): \(message)")
+        Self.logger.error("Error \(context): \(message)")
     }
 
     private func updateStyleTier() {

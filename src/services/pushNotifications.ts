@@ -200,14 +200,55 @@ async function removeInvalidToken(token: string): Promise<void> {
  * Sends a push notification to a specific user across all their registered devices.
  * Handles token invalidation automatically.
  */
+/**
+ * Notification type used to check user preferences before sending.
+ */
+export type NotificationType = 'likes' | 'comments' | 'friend_requests' | 'new_posts';
+
+/**
+ * Check whether a user has enabled a specific notification type.
+ * Returns true if preferences are not set (defaults to enabled).
+ */
+async function isNotificationEnabled(
+  userId: string,
+  notificationType?: NotificationType
+): Promise<boolean> {
+  if (!notificationType) return true; // No type specified, always send
+
+  try {
+    const { data: profile } = await supabaseAdmin
+      .from('user_profiles')
+      .select('notification_preferences')
+      .eq('id', userId)
+      .single();
+
+    if (!profile?.notification_preferences) return true; // No preferences set, default to enabled
+
+    const prefs = profile.notification_preferences as Record<string, boolean>;
+    return prefs[notificationType] !== false; // Default to true if not explicitly set to false
+  } catch {
+    return true; // On error, default to sending
+  }
+}
+
 export async function sendPushNotification(
   userId: string,
   title: string,
   body: string,
   data?: Record<string, unknown>,
-  badge?: number
+  badge?: number,
+  notificationType?: NotificationType
 ): Promise<void> {
   try {
+    // Check notification preferences before sending
+    if (notificationType) {
+      const enabled = await isNotificationEnabled(userId, notificationType);
+      if (!enabled) {
+        logger.info({ userId, notificationType }, 'Push notification skipped — disabled by user preferences');
+        return;
+      }
+    }
+
     const { data: tokens, error } = await supabaseAdmin
       .from('device_tokens')
       .select('token, platform')

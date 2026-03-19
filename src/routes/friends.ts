@@ -350,37 +350,46 @@ friends.get('/search', async (c) => {
       return c.json({ success: true, data: [] });
     }
 
-    // Check friendship status for each found user
-    const enriched = await Promise.all(
-      users.map(async (user) => {
-        const { data: friendship } = await supabaseAdmin
-          .from('friendships')
-          .select('id, status, requester_id')
-          .or(
-            `and(requester_id.eq.${userId},addressee_id.eq.${user.id}),and(requester_id.eq.${user.id},addressee_id.eq.${userId})`
-          )
-          .maybeSingle();
+    // Batch fetch all friendships for found users in a single query (fixes N+1)
+    const userIds = users.map((u) => u.id);
+    const { data: friendships } = await supabaseAdmin
+      .from('friendships')
+      .select('id, status, requester_id, addressee_id')
+      .or(
+        userIds
+          .map((uid) => `and(requester_id.eq.${userId},addressee_id.eq.${uid}),and(requester_id.eq.${uid},addressee_id.eq.${userId})`)
+          .join(',')
+      );
 
-        let friendshipStatus: string | null = null;
-        if (friendship) {
-          if (friendship.status === 'accepted') {
-            friendshipStatus = 'friends';
-          } else if (friendship.status === 'pending') {
-            friendshipStatus = friendship.requester_id === userId
-              ? 'request_sent'
-              : 'request_received';
-          } else {
-            friendshipStatus = friendship.status;
-          }
+    // Build a map of user_id -> friendship for quick lookup
+    const friendshipMap = new Map<string, { id: string; status: string; requester_id: string }>();
+    for (const f of friendships ?? []) {
+      const otherUserId = f.requester_id === userId ? f.addressee_id : f.requester_id;
+      friendshipMap.set(otherUserId, f);
+    }
+
+    const enriched = users.map((user) => {
+      const friendship = friendshipMap.get(user.id) ?? null;
+
+      let friendshipStatus: string | null = null;
+      if (friendship) {
+        if (friendship.status === 'accepted') {
+          friendshipStatus = 'friends';
+        } else if (friendship.status === 'pending') {
+          friendshipStatus = friendship.requester_id === userId
+            ? 'request_sent'
+            : 'request_received';
+        } else {
+          friendshipStatus = friendship.status;
         }
+      }
 
-        return {
-          ...user,
-          friendship_status: friendshipStatus,
-          friendship_id: friendship?.id ?? null,
-        };
-      })
-    );
+      return {
+        ...user,
+        friendship_status: friendshipStatus,
+        friendship_id: friendship?.id ?? null,
+      };
+    });
 
     return c.json({ success: true, data: enriched });
   } catch (err) {

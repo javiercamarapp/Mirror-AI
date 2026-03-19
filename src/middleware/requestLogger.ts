@@ -16,7 +16,10 @@ export async function requestLogger(
   c: Context<{ Variables: AppVariables }>,
   next: Next
 ): Promise<void> {
-  const requestId = c.req.header('x-request-id') || uuidv4();
+  // Validate x-request-id as UUID format before trusting it; fall back to a fresh UUID.
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-7][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const incomingId = c.req.header('x-request-id');
+  const requestId = (incomingId && UUID_RE.test(incomingId)) ? incomingId : uuidv4();
   const start = Date.now();
 
   // Attach request ID to response headers

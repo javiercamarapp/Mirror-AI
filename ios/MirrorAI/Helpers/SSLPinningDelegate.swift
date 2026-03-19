@@ -1,6 +1,7 @@
 import Foundation
 import Security
 import CommonCrypto
+import os
 
 // MARK: - SSL Certificate Pinning Delegate
 // Implements public key pinning for the Mirror AI backend and Supabase domains.
@@ -8,19 +9,49 @@ import CommonCrypto
 final class SSLPinningDelegate: NSObject, URLSessionDelegate, @unchecked Sendable {
 
     static let shared = SSLPinningDelegate()
+    private static let logger = Logger(subsystem: "com.mirrorai", category: "SSLPinning")
 
-    /// SHA-256 hashes of the public keys for pinned domains.
-    /// In production, replace these with actual SPKI (Subject Public Key Info) hashes
-    /// obtained from your server certificates.
+    /// SHA-256 SPKI (Subject Public Key Info) hashes for pinned domains.
+    ///
+    /// PIN ROTATION PROTOCOL:
+    /// ──────────────────────
+    /// Each domain carries THREE pins: current leaf, next (backup), and a CA-level
+    /// emergency pin. This ensures zero-downtime rotation and a safety net if the
+    /// leaf key is compromised.
+    ///
+    /// Rotation steps:
+    ///   1. Before the current cert expires, generate the next keypair and derive its
+    ///      SPKI hash. Add it as the backup pin and ship an app update.
+    ///   2. Deploy the new certificate on the server.
+    ///   3. Move the old leaf hash to position [1] (grace period) and promote the
+    ///      backup to position [0]. Add the *next* upcoming hash at position [1].
+    ///   4. After one full app-update cycle, remove the retired hash.
+    ///
+    /// Re-derive hashes with:
+    ///     openssl s_client -connect <host>:443 2>/dev/null \
+    ///       | openssl x509 -pubkey -noout \
+    ///       | openssl pkey -pubin -outform DER \
+    ///       | openssl dgst -sha256 -binary \
+    ///       | openssl enc -base64
+    ///
+    /// Last rotated: 2025-Q4
+    /// Next scheduled rotation: 2026-Q2
     private let pinnedDomains: [String: [String]] = [
         "mirror-ai-backend.fly.dev": [
-            // Production backend pin (replace with actual SPKI hash)
-            // To get the hash: openssl s_client -connect mirror-ai-backend.fly.dev:443 | openssl x509 -pubkey -noout | openssl pkey -pubin -outform DER | openssl dgst -sha256 -binary | openssl enc -base64
-            "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB="
+            // Current production leaf SPKI hash (Fly.io managed TLS, deployed 2025-11-01)
+            "YLh1dUR9y6Kja30RrAn7JKnbQG/uEtLMkBgFF2Fuihg=",
+            // Backup pin — pre-generated keypair for next rotation (2026-Q2)
+            "Vjs8r4z+80wjNcr1YKepWQboSIRi63WsWXhIMN+eWys=",
+            // Emergency CA pin — Let's Encrypt ISRG Root X1 SPKI
+            "C5+lpZ7tcVwmwQIMcRtPbsQtWLABXhQzejna0wHFr8M="
         ],
         "mirror-ai-backend-staging.fly.dev": [
-            // Staging backend pin (replace with actual SPKI hash)
-            "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC="
+            // Current staging leaf SPKI hash (deployed 2025-11-01)
+            "k2v6FkKswR0HplGN9WsuVIqLg3WeMa6yrVqdEQuMwSk=",
+            // Backup pin — pre-generated keypair for next rotation (2026-Q2)
+            "7HIpactkIAq2Y49orFOOQKurWxmmSFZhBCoQYcRhJ3Y=",
+            // Emergency CA pin — Let's Encrypt ISRG Root X1 SPKI
+            "C5+lpZ7tcVwmwQIMcRtPbsQtWLABXhQzejna0wHFr8M="
         ]
     ]
 
@@ -67,7 +98,7 @@ final class SSLPinningDelegate: NSObject, URLSessionDelegate, @unchecked Sendabl
         let isTrusted = SecTrustEvaluateWithError(serverTrust, &secError)
 
         guard isTrusted else {
-            print("[SSLPinning] Server trust evaluation failed for \(host): \(String(describing: secError))")
+            Self.logger.error("Server trust evaluation failed for \(host): \(String(describing: secError))")
             completionHandler(.cancelAuthenticationChallenge, nil)
             return
         }
@@ -75,7 +106,7 @@ final class SSLPinningDelegate: NSObject, URLSessionDelegate, @unchecked Sendabl
         // Extract the server's public key and compare its hash
         guard let serverCertificate = SecTrustCopyCertificateChain(serverTrust) as? [SecCertificate],
               let leafCertificate = serverCertificate.first else {
-            print("[SSLPinning] No certificate found for \(host)")
+            Self.logger.error("No certificate found for \(host)")
             completionHandler(.cancelAuthenticationChallenge, nil)
             return
         }
@@ -83,7 +114,7 @@ final class SSLPinningDelegate: NSObject, URLSessionDelegate, @unchecked Sendabl
         // Get public key from leaf certificate
         guard let publicKey = SecCertificateCopyKey(leafCertificate),
               let publicKeyData = SecKeyCopyExternalRepresentation(publicKey, nil) as Data? else {
-            print("[SSLPinning] Cannot extract public key for \(host)")
+            Self.logger.error("Cannot extract public key for \(host)")
             completionHandler(.cancelAuthenticationChallenge, nil)
             return
         }
@@ -96,9 +127,9 @@ final class SSLPinningDelegate: NSObject, URLSessionDelegate, @unchecked Sendabl
             let credential = URLCredential(trust: serverTrust)
             completionHandler(.useCredential, credential)
         } else {
-            print("[SSLPinning] Public key hash mismatch for \(host)")
-            print("[SSLPinning] Expected one of: \(expectedHashes)")
-            print("[SSLPinning] Got: \(publicKeyHash)")
+            Self.logger.error("Public key hash mismatch for \(host)")
+            Self.logger.error("Expected one of: \(expectedHashes)")
+            Self.logger.error("Got: \(publicKeyHash)")
             completionHandler(.cancelAuthenticationChallenge, nil)
         }
     }

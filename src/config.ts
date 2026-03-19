@@ -60,7 +60,7 @@ const ENV_SCHEMA = {
   logLevel:           stringVar('LOG_LEVEL', { default: 'info' }),
 
   // CORS
-  allowedOrigins:     stringVar('ALLOWED_ORIGINS', { default: '*' }),
+  allowedOrigins:     stringVar('ALLOWED_ORIGINS', { default: 'https://mirror-ai.app' }),
 
   // APNs Push Notifications (optional — push disabled without these)
   apnsKeyId:          stringVar('APNS_KEY_ID', { default: '' }),
@@ -95,6 +95,36 @@ function buildConfig(): ConfigShape {
       errors.push(`${def.envKey} is required but not set`);
     } else {
       result[key] = def.default;
+    }
+  }
+
+  // Reject wildcard CORS in production and staging
+  const isProduction = (result.nodeEnv as string) === 'production';
+  const isStaging = (result.nodeEnv as string) === 'staging';
+  if ((isProduction || isStaging) && (result.allowedOrigins as string) === '*') {
+    errors.push(
+      'ALLOWED_ORIGINS must not be "*" in production or staging. ' +
+      'Set it to a comma-separated list of allowed origins (e.g. "https://mirror-ai.app,https://admin.mirror-ai.app").'
+    );
+  }
+
+  // Even in development, warn if wildcard CORS is used
+  if ((result.allowedOrigins as string) === '*' && !isProduction && !isStaging) {
+    console.warn(
+      '[config] WARNING: ALLOWED_ORIGINS is set to "*". This is acceptable only for local development.'
+    );
+  }
+
+  // Validate that each origin looks like a proper URL (not just any string)
+  if ((result.allowedOrigins as string) !== '*') {
+    const origins = (result.allowedOrigins as string).split(',').map(o => o.trim());
+    for (const origin of origins) {
+      if (!/^https?:\/\/[^\s/]+$/.test(origin)) {
+        errors.push(
+          `ALLOWED_ORIGINS contains an invalid origin: "${origin}". ` +
+          'Each origin must be a valid URL like "https://mirror-ai.app" (no trailing slash, no path).'
+        );
+      }
     }
   }
 

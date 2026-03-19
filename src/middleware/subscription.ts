@@ -141,6 +141,21 @@ export async function checkWardrobeLimit(userId: string): Promise<{
  */
 const aiDailyUsage = new Map<string, { count: number; date: string }>();
 
+/**
+ * Periodic cleanup of stale entries in the aiDailyUsage Map.
+ * Removes entries older than 1 day to prevent memory leaks.
+ */
+const AI_USAGE_CLEANUP_INTERVAL_MS = 60_000; // 60 seconds
+
+setInterval(() => {
+  const today = new Date().toISOString().slice(0, 10);
+  for (const [key, entry] of aiDailyUsage) {
+    if (entry.date !== today) {
+      aiDailyUsage.delete(key);
+    }
+  }
+}, AI_USAGE_CLEANUP_INTERVAL_MS).unref();
+
 export function checkAIChatLimit(userId: string, plan: SubscriptionPlan): {
   allowed: boolean;
   limit: number;

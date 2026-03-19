@@ -35,6 +35,36 @@ const startTime = Date.now();
 
 const app = new Hono<{ Variables: AppVariables }>();
 
+// ─── Request Body Size Limits ────────────────────────────────────────────────
+// Global limit: reject any request body larger than 10 MB.
+// Image-upload endpoints have their own per-route validation; this is a safety net.
+app.use('*', async (c, next) => {
+  const contentLength = parseInt(c.req.header('content-length') ?? '0', 10);
+  const GLOBAL_MAX = 10 * 1024 * 1024; // 10 MB
+
+  if (contentLength > GLOBAL_MAX) {
+    return c.json({ success: false, error: 'Request body too large (max 10 MB)' }, 413);
+  }
+
+  // For non-image endpoints, enforce a tighter 1 MB limit.
+  const path = c.req.path;
+  const isImageEndpoint =
+    path.includes('/images/') ||
+    path.includes('/avatar') ||
+    path.includes('/vton') ||
+    path.includes('/ai/analyze-outfit') ||
+    path.includes('/ai/analyze-colors') ||
+    path.includes('/ai/identify-garment') ||
+    path.includes('/outfits/daily');
+
+  const STRICT_MAX = 1 * 1024 * 1024; // 1 MB
+  if (!isImageEndpoint && contentLength > STRICT_MAX) {
+    return c.json({ success: false, error: 'Request body too large (max 1 MB for this endpoint)' }, 413);
+  }
+
+  await next();
+});
+
 // ─── Structured Request Logging ─────────────────────────────────────────────
 
 app.use('*', requestLogger);
@@ -106,6 +136,35 @@ app.get('/api/health/ready', async (c) => {
     // Redis is optional — don't mark as unhealthy if unavailable
   } catch {
     checks.redis = { status: 'unavailable', latency: Date.now() - redisStart };
+  }
+
+  // Check Gemini API connectivity
+  const geminiStart = Date.now();
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-04-17:generateContent`;
+    const response = await fetch(geminiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': config.geminiApiKey,
+      },
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts: [{ text: 'ping' }] }],
+        generation_config: { max_output_tokens: 1 },
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    checks.gemini = {
+      status: response.ok ? 'ok' : 'degraded',
+      latency: Date.now() - geminiStart,
+    };
+    if (!response.ok) allHealthy = false;
+  } catch {
+    checks.gemini = { status: 'down', latency: Date.now() - geminiStart };
+    allHealthy = false;
   }
 
   const status = allHealthy ? 'ready' : 'degraded';

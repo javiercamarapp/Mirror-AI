@@ -1,5 +1,6 @@
 import StoreKit
 import Foundation
+import os
 
 enum StoreError: LocalizedError {
     case pending(String)
@@ -16,6 +17,7 @@ enum StoreError: LocalizedError {
 @MainActor
 class StoreKitManager: ObservableObject {
     static let shared = StoreKitManager()
+    private static let logger = Logger(subsystem: "com.mirrorai", category: "StoreKitManager")
 
     @Published var subscriptions: [Product] = []
     @Published var creditPacks: [Product] = []
@@ -60,7 +62,7 @@ class StoreKitManager: ObservableObject {
                 .sorted { $0.price < $1.price }
         } catch {
             productsLoadError = "Unable to load products. Please check your connection."
-            print("Failed to load products: \(error)")
+            Self.logger.error("Failed to load products: \(error.localizedDescription)")
         }
     }
 
@@ -115,7 +117,7 @@ class StoreKitManager: ObservableObject {
 
                     await self.updateSubscriptionStatus()
                 } catch {
-                    print("Transaction failed verification: \(error)")
+                    Self.logger.error("Transaction failed verification: \(error.localizedDescription)")
                 }
             }
         }
@@ -140,7 +142,7 @@ class StoreKitManager: ObservableObject {
                 )
             }
         } catch {
-            print("Backend receipt verification failed: \(error.localizedDescription)")
+            Self.logger.error("Backend receipt verification failed: \(error.localizedDescription)")
         }
     }
 

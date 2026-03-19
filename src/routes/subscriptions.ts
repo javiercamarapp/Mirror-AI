@@ -48,6 +48,20 @@ subscriptions.post('/webhooks/appstore', async (c) => {
       case 'DID_RENEW': {
         if (!transactionData?.originalTransactionId) break;
 
+        // Idempotency: check if this transaction was already processed
+        if (transactionData.transactionId) {
+          const { data: existingTxn } = await supabaseAdmin
+            .from('subscription_history')
+            .select('id')
+            .eq('transaction_id', transactionData.transactionId)
+            .maybeSingle();
+
+          if (existingTxn) {
+            logger.info({ transactionId: transactionData.transactionId }, 'DID_RENEW already processed, skipping');
+            break;
+          }
+        }
+
         // Find subscription by original transaction id
         const { data: sub } = await supabaseAdmin
           .from('subscription_history')
@@ -55,13 +69,13 @@ subscriptions.post('/webhooks/appstore', async (c) => {
           .eq('transaction_id', transactionData.originalTransactionId)
           .order('created_at', { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
 
         if (sub) {
           const newExpiry = transactionData.expiresDate ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
           // Insert new subscription record for the renewal
-          await supabaseAdmin.from('subscription_history').insert({
+          const { error: insertError } = await supabaseAdmin.from('subscription_history').insert({
             id: uuidv4(),
             user_id: sub.user_id,
             product_id: sub.product_id,
@@ -72,12 +86,31 @@ subscriptions.post('/webhooks/appstore', async (c) => {
             expires_at: newExpiry,
           });
 
-          // Reset credits
+          if (insertError) {
+            logger.error({ err: insertError }, 'DID_RENEW: Failed to insert subscription history');
+            break;
+          }
+
+          // Reset credits atomically
           const plan = sub.plan ?? 'free';
           const credits = CREDITS_BY_PLAN[plan] ?? 3;
+          try {
+            await supabaseAdmin.rpc('increment_credits_atomic', {
+              p_user_id: sub.user_id,
+              p_amount: credits,
+              p_request_id: transactionData.transactionId ?? null,
+            });
+          } catch (creditErr) {
+            logger.error({ err: creditErr }, 'DID_RENEW: Failed to increment credits, falling back to direct update');
+            await supabaseAdmin
+              .from('user_profiles')
+              .update({ subscription_plan: plan, vton_credits: credits })
+              .eq('id', sub.user_id);
+          }
+
           await supabaseAdmin
             .from('user_profiles')
-            .update({ subscription_plan: plan, vton_credits: credits })
+            .update({ subscription_plan: plan })
             .eq('id', sub.user_id);
         }
         break;
@@ -93,7 +126,7 @@ subscriptions.post('/webhooks/appstore', async (c) => {
           .eq('status', 'active')
           .order('created_at', { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
 
         if (sub) {
           await supabaseAdmin
@@ -114,7 +147,7 @@ subscriptions.post('/webhooks/appstore', async (c) => {
           .in('status', ['active', 'billing_retry'])
           .order('created_at', { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
 
         if (sub) {
           await supabaseAdmin
@@ -140,7 +173,7 @@ subscriptions.post('/webhooks/appstore', async (c) => {
           .eq('transaction_id', transactionData.transactionId)
           .order('created_at', { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
 
         if (sub) {
           await supabaseAdmin
@@ -226,7 +259,7 @@ subscriptions.post('/verify', async (c) => {
         .select('id')
         .eq('transaction_id', verification.transactionId)
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (existingSub) {
         return c.json({ success: false, error: 'Transaction already processed' }, 409);
@@ -315,7 +348,7 @@ subscriptions.get('/status', async (c) => {
       .eq('status', 'active')
       .order('created_at', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
     // Check if subscription has expired
     if (activeSub?.expires_at && new Date(activeSub.expires_at) < new Date()) {
@@ -372,7 +405,7 @@ subscriptions.post('/restore', async (c) => {
       .eq('status', 'active')
       .order('created_at', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (subError || !activeSub) {
       return c.json({ success: false, error: 'No active subscription found for this receipt' }, 404);
@@ -443,29 +476,18 @@ subscriptions.post('/purchases/credits', async (c) => {
       return c.json({ success: false, error: 'Invalid or inactive credit pack' }, 400);
     }
 
-    // Get current credits
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('user_profiles')
-      .select('vton_credits')
-      .eq('id', userId)
-      .single();
+    // Idempotency: check if this transaction was already processed
+    const { data: existingPurchase } = await supabaseAdmin
+      .from('purchases')
+      .select('id')
+      .eq('transaction_id', body.transaction_id)
+      .maybeSingle();
 
-    if (profileError || !profile) {
-      return c.json({ success: false, error: 'Profile not found' }, 404);
+    if (existingPurchase) {
+      return c.json({ success: false, error: 'Transaction already processed' }, 409);
     }
 
-    // Add credits to user
-    const updatedCredits = (profile.vton_credits ?? 0) + (pack.credits ?? 0);
-    const { error: updateError } = await supabaseAdmin
-      .from('user_profiles')
-      .update({ vton_credits: updatedCredits })
-      .eq('id', userId);
-
-    if (updateError) {
-      return c.json({ success: false, error: updateError.message }, 500);
-    }
-
-    // Insert purchase record
+    // Insert purchase record first (acts as idempotency lock via transaction_id)
     const { error: purchaseError } = await supabaseAdmin
       .from('purchases')
       .insert({
@@ -479,6 +501,35 @@ subscriptions.post('/purchases/credits', async (c) => {
 
     if (purchaseError) {
       logger.error({ err: purchaseError }, 'Failed to create purchase record');
+      return c.json({ success: false, error: 'Failed to record purchase' }, 500);
+    }
+
+    // Add credits atomically using RPC
+    let updatedCredits: number;
+    try {
+      const { data: newCredits, error: creditError } = await supabaseAdmin
+        .rpc('increment_credits_atomic', {
+          p_user_id: userId,
+          p_amount: pack.credits ?? 0,
+          p_request_id: body.transaction_id,
+        });
+
+      if (creditError) throw creditError;
+      updatedCredits = newCredits;
+    } catch (creditErr) {
+      logger.error({ err: creditErr }, 'Atomic credit increment failed, falling back');
+      // Fallback: read-then-write (less safe but better than failing)
+      const { data: profile } = await supabaseAdmin
+        .from('user_profiles')
+        .select('vton_credits')
+        .eq('id', userId)
+        .single();
+
+      updatedCredits = (profile?.vton_credits ?? 0) + (pack.credits ?? 0);
+      await supabaseAdmin
+        .from('user_profiles')
+        .update({ vton_credits: updatedCredits })
+        .eq('id', userId);
     }
 
     return c.json({

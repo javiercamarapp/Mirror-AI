@@ -1,4 +1,22 @@
 import { config } from '../config.js';
+import { geminiBreaker } from './circuit-breaker.js';
+import { logger } from './logger.js';
+
+const isProduction = config.nodeEnv === 'production';
+
+/**
+ * Sanitize error messages in production to avoid leaking internal details.
+ */
+function sanitizeError(error: unknown): Error {
+  if (!isProduction) {
+    return error instanceof Error ? error : new Error(String(error));
+  }
+  // In production, return a generic message
+  if (error instanceof Error && error.message.includes('Circuit breaker')) {
+    return new Error('Service temporarily unavailable. Please try again later.');
+  }
+  return new Error('An unexpected error occurred while processing your request.');
+}
 
 const BASE_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-04-17';
@@ -48,7 +66,7 @@ interface GeminiResponse {
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1000;
 
-async function callGemini(request: GeminiRequest): Promise<string> {
+async function callGeminiRaw(request: GeminiRequest): Promise<string> {
   const url = `${BASE_URL}:generateContent`;
 
   let lastError: Error | null = null;
@@ -100,6 +118,18 @@ async function callGemini(request: GeminiRequest): Promise<string> {
   }
 
   throw lastError ?? new Error('Gemini request failed after retries');
+}
+
+/**
+ * Call Gemini API wrapped with circuit breaker for fault tolerance.
+ */
+async function callGemini(request: GeminiRequest): Promise<string> {
+  try {
+    return await geminiBreaker.execute(() => callGeminiRaw(request));
+  } catch (error) {
+    logger.error({ err: error instanceof Error ? error.message : String(error) }, 'Gemini API call failed');
+    throw sanitizeError(error);
+  }
 }
 
 function buildSystemInstruction(systemPrompt?: string): { parts: GeminiTextPart[] } | undefined {

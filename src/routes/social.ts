@@ -224,44 +224,32 @@ social.post('/posts/:id/like', async (c) => {
       .maybeSingle();
 
     if (existing) {
-      // Unlike: remove the like and decrement count
+      // Unlike: remove the like and decrement count atomically
       await supabaseAdmin.from('post_likes').delete().eq('id', existing.id);
 
-      // Decrement likes_count
-      const { data: post } = await supabaseAdmin
-        .from('social_posts')
-        .select('likes_count')
-        .eq('id', postId)
-        .single();
-
-      if (post) {
-        await supabaseAdmin
-          .from('social_posts')
-          .update({ likes_count: Math.max(0, (post.likes_count ?? 1) - 1) })
-          .eq('id', postId);
-      }
+      // Decrement likes_count atomically using RPC
+      await supabaseAdmin.rpc('increment_post_likes', { p_post_id: postId, p_delta: -1 });
 
       return c.json({ success: true, data: { liked: false } });
     } else {
-      // Like: add the like and increment count
+      // Like: add the like and increment count atomically
       await supabaseAdmin.from('post_likes').insert({
         id: uuidv4(),
         post_id: postId,
         user_id: userId,
       });
 
-      // Increment likes_count
+      // Increment likes_count atomically using RPC
+      await supabaseAdmin.rpc('increment_post_likes', { p_post_id: postId, p_delta: 1 });
+
+      // Get post info for notification
       const { data: post } = await supabaseAdmin
         .from('social_posts')
-        .select('likes_count, user_id')
+        .select('user_id')
         .eq('id', postId)
         .single();
 
       if (post) {
-        await supabaseAdmin
-          .from('social_posts')
-          .update({ likes_count: (post.likes_count ?? 0) + 1 })
-          .eq('id', postId);
 
         // Notify post author (if not self)
         if (post.user_id !== userId) {
@@ -354,8 +342,28 @@ social.post('/posts/:id/comments', moderationMiddleware, async (c) => {
       return c.json({ success: false, error: 'Comment must be 500 characters or less' }, 400);
     }
 
-    // Sanitize: strip HTML tags
-    const sanitizedContent = body.content.trim().replace(/<[^>]*>/g, '');
+    // Robust HTML sanitization:
+    // 1. Decode common HTML entities to catch encoded injection attempts
+    let rawContent = body.content.trim()
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/&amp;/gi, '&')
+      .replace(/&quot;/gi, '"')
+      .replace(/&#x27;/gi, "'")
+      .replace(/&#x2F;/gi, '/')
+      .replace(/&#(\d+);/g, (_, dec: string) => String.fromCharCode(parseInt(dec, 10)))
+      .replace(/&#x([0-9a-fA-F]+);/g, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)));
+    // 2. Strip all HTML/XML tags iteratively (handles nested/malformed tags like <<script>script>)
+    let previous: string;
+    do {
+      previous = rawContent;
+      rawContent = rawContent.replace(/<\/?[^>]+(>|$)/g, '');
+    } while (rawContent !== previous);
+    // 3. Strip any remaining angle brackets that could form tags
+    rawContent = rawContent.replace(/[<>]/g, '');
+    // 4. Remove control characters (keep newlines and tabs)
+    rawContent = rawContent.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+    const sanitizedContent = rawContent.trim();
 
     const { data: comment, error } = await supabaseAdmin
       .from('post_comments')
@@ -372,19 +380,17 @@ social.post('/posts/:id/comments', moderationMiddleware, async (c) => {
       return c.json({ success: false, error: error.message }, 500);
     }
 
-    // Increment comments_count on the post
+    // Increment comments_count atomically using RPC
+    await supabaseAdmin.rpc('increment_post_comments', { p_post_id: postId, p_delta: 1 });
+
+    // Get post owner for notification
     const { data: post } = await supabaseAdmin
       .from('social_posts')
-      .select('comments_count, user_id')
+      .select('user_id')
       .eq('id', postId)
       .single();
 
     if (post) {
-      await supabaseAdmin
-        .from('social_posts')
-        .update({ comments_count: (post.comments_count ?? 0) + 1 })
-        .eq('id', postId);
-
       // Notify post author (if not self)
       if (post.user_id !== userId) {
         const { data: commenter } = await supabaseAdmin
@@ -425,40 +431,30 @@ social.post('/posts/:id/comments', moderationMiddleware, async (c) => {
 });
 
 // ─── DELETE /social/posts/:id ───────────────────────────────────────────────
-// Delete own post (cascades to likes and comments).
+// Soft-delete own post (sets deleted_at instead of hard deleting).
 social.delete('/posts/:id', async (c) => {
   try {
     const userId = c.get('userId');
     const postId = c.req.param('id');
 
-    // Verify ownership
-    const { data: post } = await supabaseAdmin
-      .from('social_posts')
-      .select('id, user_id')
-      .eq('id', postId)
-      .single();
-
-    if (!post) {
-      return c.json({ success: false, error: 'Post not found' }, 404);
-    }
-
-    if (post.user_id !== userId) {
-      return c.json({ success: false, error: 'You can only delete your own posts' }, 403);
-    }
-
-    // Delete associated data first
-    await supabaseAdmin.from('post_comments').delete().eq('post_id', postId);
-    await supabaseAdmin.from('post_likes').delete().eq('post_id', postId);
-
-    // Delete the post
-    const { error } = await supabaseAdmin
-      .from('social_posts')
-      .delete()
-      .eq('id', postId);
+    // Soft delete the post using the database function (verifies ownership)
+    const { data: deleted, error } = await supabaseAdmin
+      .rpc('soft_delete_post', { p_post_id: postId, p_user_id: userId });
 
     if (error) {
       return c.json({ success: false, error: error.message }, 500);
     }
+
+    if (!deleted) {
+      return c.json({ success: false, error: 'Post not found or not owned by you' }, 404);
+    }
+
+    // Soft delete associated comments
+    await supabaseAdmin
+      .from('post_comments')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('post_id', postId)
+      .is('deleted_at', null);
 
     return c.json({ success: true, data: { message: 'Post deleted successfully' } });
   } catch (err) {
@@ -617,19 +613,8 @@ social.post('/stories/:id/view', async (c) => {
         { onConflict: 'story_id,user_id' }
       );
 
-    // Increment views_count on the story
-    const { data: story } = await supabaseAdmin
-      .from('stories')
-      .select('views_count')
-      .eq('id', storyId)
-      .single();
-
-    if (story) {
-      await supabaseAdmin
-        .from('stories')
-        .update({ views_count: (story.views_count ?? 0) + 1 })
-        .eq('id', storyId);
-    }
+    // Increment views_count atomically using RPC
+    await supabaseAdmin.rpc('increment_story_views', { p_story_id: storyId });
 
     return c.json({ success: true, data: { message: 'Story viewed' } });
   } catch (err) {
