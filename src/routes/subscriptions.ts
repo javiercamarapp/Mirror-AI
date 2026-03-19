@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { supabaseAdmin } from '../services/supabase.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { logger } from '../services/logger.js';
 import type { AppVariables } from '../types/index.js';
 import { v4 as uuidv4 } from 'uuid';
 import { verifyTransaction, verifySignedPayload } from '../services/appstore.js';
@@ -18,7 +19,7 @@ subscriptions.post('/webhooks/appstore', async (c) => {
 
     // Step 1: Require the signedPayload field
     if (!body.signedPayload) {
-      console.warn('[App Store Webhook] Rejected: missing signedPayload');
+      logger.warn('App Store Webhook rejected: missing signedPayload');
       return c.json({ success: false, error: 'Missing signedPayload' }, 400);
     }
 

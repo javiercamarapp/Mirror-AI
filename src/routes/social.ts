@@ -4,6 +4,7 @@ import { authMiddleware } from '../middleware/auth.js';
 import { moderationMiddleware } from '../middleware/moderation.js';
 import { sendPushNotification } from '../services/pushNotifications.js';
 import { processReports } from '../services/contentModeration.js';
+import { logger } from '../services/logger.js';
 import type { AppVariables } from '../types/index.js';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -96,7 +97,7 @@ social.get('/feed', async (c) => {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[Feed Error]:', err);
+    logger.error({ err }, 'Feed fetch failed');
     return c.json({ success: false, error: message }, 500);
   }
 });
@@ -167,7 +168,7 @@ social.post('/posts', moderationMiddleware, async (c) => {
     return c.json({ success: true, data: { ...post, is_liked: false } }, 201);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[Create Post Error]:', err);
+    logger.error({ err }, 'Create post failed');
     return c.json({ success: false, error: message }, 500);
   }
 });
@@ -296,7 +297,7 @@ social.post('/posts/:id/like', async (c) => {
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[Like Error]:', err);
+    logger.error({ err }, 'Like toggle failed');
     return c.json({ success: false, error: message }, 500);
   }
 });
@@ -418,7 +419,7 @@ social.post('/posts/:id/comments', moderationMiddleware, async (c) => {
     return c.json({ success: true, data: comment }, 201);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[Comment Error]:', err);
+    logger.error({ err }, 'Comment creation failed');
     return c.json({ success: false, error: message }, 500);
   }
 });
@@ -505,7 +506,7 @@ social.post('/stories', async (c) => {
     return c.json({ success: true, data: story }, 201);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[Create Story Error]:', err);
+    logger.error({ err }, 'Create story failed');
     return c.json({ success: false, error: message }, 500);
   }
 });
@@ -596,7 +597,7 @@ social.get('/stories', async (c) => {
     return c.json({ success: true, data: sorted });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[Stories Error]:', err);
+    logger.error({ err }, 'Stories fetch failed');
     return c.json({ success: false, error: message }, 500);
   }
 });
@@ -802,13 +803,13 @@ social.post('/report', async (c) => {
 
     // Process report thresholds (auto-flag, auto-hide, auto-suspend)
     processReports(body.content_type, body.content_id).catch((err) => {
-      console.error('[Report] Failed to process report thresholds:', err);
+      logger.error({ err }, 'Failed to process report thresholds');
     });
 
     return c.json({ success: true, data: report }, 201);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[Report Error]:', err);
+    logger.error({ err }, 'Report submission failed');
     return c.json({ success: false, error: message }, 500);
   }
 });
@@ -855,7 +856,7 @@ social.post('/block', async (c) => {
     return c.json({ success: true, data: { message: 'User blocked successfully' } }, 201);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[Block Error]:', err);
+    logger.error({ err }, 'Block user failed');
     return c.json({ success: false, error: message }, 500);
   }
 });
@@ -929,7 +930,7 @@ social.post('/posts/:id/share', async (c) => {
   try {
     const userId = c.get('userId');
     const postId = c.req.param('id');
-    const body = await c.req.json<{ platform?: string }>().catch(() => ({}));
+    const body = await c.req.json<{ platform?: string }>().catch((): { platform?: string } => ({}));
 
     // Verify post exists
     const { data: post } = await supabaseAdmin
@@ -961,7 +962,7 @@ social.post('/posts/:id/share', async (c) => {
     return c.json({ success: true, data: share }, 201);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[Share Error]:', err);
+    logger.error({ err }, 'Share failed');
     return c.json({ success: false, error: message }, 500);
   }
 });
@@ -1198,7 +1199,7 @@ social.post('/admin/reports/:id/action', async (c) => {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[Admin Action Error]:', err);
+    logger.error({ err }, 'Admin action failed');
     return c.json({ success: false, error: message }, 500);
   }
 });

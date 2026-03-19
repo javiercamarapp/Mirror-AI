@@ -2,6 +2,7 @@ import SwiftUI
 
 struct WardrobeView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var selectedCategory: String? = nil
     @State private var searchText = ""
@@ -16,7 +17,7 @@ struct WardrobeView: View {
 
     private var categories: [String] {
         let cats = Set(appState.wardrobeItems.map { $0.category })
-        return ["All"] + cats.sorted()
+        return [L10n.wardrobeTitle == "Wardrobe" ? "All" : "All"] + cats.sorted()
     }
 
     private var filteredItems: [WardrobeItemModel] {
@@ -53,11 +54,13 @@ struct WardrobeView: View {
 
                         // Item count
                         HStack {
-                            Text("\(filteredItems.count) items")
-                                .font(.system(size: 13, weight: .medium))
+                            Text(L10n.wardrobeItems(filteredItems.count))
+                                .font(.caption)
+                                .fontWeight(.medium)
                                 .foregroundStyle(.secondary)
                             Spacer()
                         }
+                        .accessibilityLabel("\(filteredItems.count) items in wardrobe")
 
                         // Grid
                         LazyVGrid(columns: columns, spacing: 14) {
@@ -82,7 +85,7 @@ struct WardrobeView: View {
                 .padding(.bottom, 20)
         }
         .background(Color(UIColor.systemBackground))
-        .navigationTitle("Wardrobe")
+        .navigationTitle(L10n.wardrobeTitle)
         .navigationBarTitleDisplayMode(.large)
         .sheet(isPresented: $showAddItem) {
             AddItemView()
@@ -95,14 +98,19 @@ struct WardrobeView: View {
         }
         .overlay {
             if appState.wardrobeLoading {
-                LoadingOverlay(message: "Loading wardrobe...")
+                LoadingOverlay(message: L10n.wardrobeLoading)
             }
         }
         .onAppear {
-            withAnimation(.easeOut(duration: 0.5).delay(0.1)) {
+            if reduceMotion {
                 animateGrid = true
+            } else {
+                withAnimation(.easeOut(duration: 0.5).delay(0.1)) {
+                    animateGrid = true
+                }
             }
         }
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }
 
     // MARK: - Search Bar
@@ -112,9 +120,10 @@ struct WardrobeView: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 16))
                 .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
 
-            TextField("Search wardrobe...", text: $searchText)
-                .font(.system(size: 16))
+            TextField(L10n.wardrobeSearchPlaceholder, text: $searchText)
+                .font(.body)
 
             if !searchText.isEmpty {
                 Button {
@@ -124,6 +133,7 @@ struct WardrobeView: View {
                         .font(.system(size: 16))
                         .foregroundStyle(.secondary)
                 }
+                .accessibilityLabel(L10n.a11yClearSearch)
             }
         }
         .padding(.horizontal, 14)
@@ -143,18 +153,23 @@ struct WardrobeView: View {
                     Button {
                         let impactFeedback = UIImpactFeedbackGenerator(style: .light)
                         impactFeedback.impactOccurred()
-                        withAnimation(.spring(response: 0.3)) {
+                        if reduceMotion {
                             selectedCategory = category == "All" ? nil : category
+                        } else {
+                            withAnimation(.spring(response: 0.3)) {
+                                selectedCategory = category == "All" ? nil : category
+                            }
                         }
                     } label: {
                         HStack(spacing: 6) {
                             if category != "All" {
                                 Text(categoryEmoji(category))
-                                    .font(.system(size: 13))
+                                    .font(.caption)
                             }
 
                             Text(category)
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(.caption)
+                                .fontWeight(.semibold)
                         }
                         .foregroundStyle(isSelectedCategory(category) ? .white : .primary)
                         .padding(.horizontal, 16)
@@ -168,6 +183,8 @@ struct WardrobeView: View {
                                 )
                         )
                     }
+                    .accessibilityLabel(category)
+                    .accessibilityAddTraits(isSelectedCategory(category) ? [.isSelected, .isButton] : .isButton)
                 }
             }
             .padding(.vertical, 2)
@@ -207,6 +224,7 @@ struct WardrobeView: View {
                             .foregroundStyle(.tertiary)
                     }
                     .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .accessibilityLabel(L10n.clothingImage(item.name))
                 }
                 .frame(height: 180)
 
@@ -221,17 +239,21 @@ struct WardrobeView: View {
                                 .fill(.ultraThinMaterial)
                         )
                         .padding(8)
+                        .accessibilityLabel(L10n.a11yFavorited)
                 }
             }
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.name)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.8)
 
                 HStack(spacing: 6) {
                     Text(item.category)
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.caption2)
+                        .fontWeight(.medium)
                         .foregroundStyle(MirrorTheme.purple)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
@@ -247,13 +269,17 @@ struct WardrobeView: View {
                             Circle()
                                 .strokeBorder(Color.white.opacity(0.3), lineWidth: 1)
                         )
+                        .accessibilityLabel(item.color)
                 }
             }
             .padding(.horizontal, 4)
         }
         .opacity(animateGrid ? 1 : 0)
         .offset(y: animateGrid ? 0 : 20)
-        .animation(.spring(response: 0.4).delay(Double(index) * 0.05), value: animateGrid)
+        .animation(reduceMotion ? nil : .spring(response: 0.4).delay(Double(index) * 0.05), value: animateGrid)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("Opens item details")
     }
 
     private func colorFromName(_ name: String) -> Color {
@@ -280,9 +306,9 @@ struct WardrobeView: View {
     private var emptyState: some View {
         EmptyStateView(
             icon: "tshirt.fill",
-            title: "Your Wardrobe is Empty",
-            description: "Add your first clothing item to get started with AI styling",
-            actionTitle: "Add First Item"
+            title: L10n.wardrobeEmptyTitle,
+            description: L10n.wardrobeEmptyDescription,
+            actionTitle: L10n.wardrobeAddFirstItem
         ) {
             showAddItem = true
         }
@@ -307,5 +333,7 @@ struct WardrobeView: View {
                     .foregroundStyle(.white)
             }
         }
+        .accessibilityLabel(L10n.a11yAddButton)
+        .accessibilityHint("Opens the add clothing item screen")
     }
 }

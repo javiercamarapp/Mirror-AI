@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HomeView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var showDailyOutfit = false
     @State private var showAIChat = false
@@ -17,9 +18,14 @@ struct HomeView: View {
                     .offset(y: greetingOffset)
                     .opacity(greetingOpacity)
                     .onAppear {
-                        withAnimation(.easeOut(duration: 0.6)) {
+                        if reduceMotion {
                             greetingOffset = 0
                             greetingOpacity = 1
+                        } else {
+                            withAnimation(.easeOut(duration: 0.6)) {
+                                greetingOffset = 0
+                                greetingOpacity = 1
+                            }
                         }
                     }
 
@@ -63,6 +69,7 @@ struct HomeView: View {
         .refreshable {
             await refreshData()
         }
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }
 
     // MARK: - Greeting
@@ -71,13 +78,18 @@ struct HomeView: View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Hey \(appState.currentUser?.name ?? "there")!")
-                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .font(.title)
+                    .fontWeight(.bold)
+                    .fontDesign(.rounded)
                     .foregroundStyle(MirrorTheme.gradientPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
 
                 Text(greetingSubtitle)
-                    .font(.system(size: 15))
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
+            .accessibilityElement(children: .combine)
 
             Spacer()
 
@@ -88,10 +100,10 @@ struct HomeView: View {
     private var greetingSubtitle: String {
         let hour = Calendar.current.component(.hour, from: Date())
         switch hour {
-        case 5..<12: return "Good morning! Ready to slay?"
-        case 12..<17: return "Looking good this afternoon!"
-        case 17..<21: return "Evening vibes loading..."
-        default: return "Night owl fashion mode"
+        case 5..<12: return L10n.homeGreetingMorning
+        case 12..<17: return L10n.homeGreetingAfternoon
+        case 17..<21: return L10n.homeGreetingEvening
+        default: return L10n.homeGreetingNight
         }
     }
 
@@ -115,26 +127,30 @@ struct HomeView: View {
                             }
                             .frame(width: 80, height: 80)
                             .clipShape(RoundedRectangle(cornerRadius: 16))
+                            .accessibilityHidden(true)
                         } else {
                             Image(systemName: "person.fill")
                                 .font(.system(size: 32))
                                 .foregroundStyle(MirrorTheme.gradientPrimary)
+                                .accessibilityHidden(true)
                         }
                     }
 
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Your Avatar")
-                            .font(.system(size: 18, weight: .bold))
+                        Text(L10n.homeAvatarTitle)
+                            .font(.headline)
 
-                        Text("Tap to customize your look")
-                            .font(.system(size: 13))
+                        Text(L10n.homeAvatarSubtitle)
+                            .font(.caption)
                             .foregroundStyle(.secondary)
 
                         HStack(spacing: 4) {
                             Image(systemName: "sparkles")
                                 .font(.system(size: 11))
-                            Text("AI-generated")
-                                .font(.system(size: 11, weight: .medium))
+                                .accessibilityHidden(true)
+                            Text(L10n.homeAvatarAIGenerated)
+                                .font(.caption2)
+                                .fontWeight(.medium)
                         }
                         .foregroundStyle(MirrorTheme.purple)
                     }
@@ -144,6 +160,7 @@ struct HomeView: View {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(.tertiary)
+                        .accessibilityHidden(true)
                 }
                 .padding(4)
 
@@ -157,13 +174,17 @@ struct HomeView: View {
                             Image(systemName: "lock.fill")
                                 .font(.system(size: 24))
                                 .foregroundStyle(MirrorTheme.gradientPrimary)
+                                .accessibilityHidden(true)
 
                             PremiumBadge()
                         }
                     }
+                    .accessibilityLabel(L10n.a11yPremiumBadge)
+                    .accessibilityHint("Upgrade to unlock avatar features")
                 }
             }
         }
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: - Today's Outfit
@@ -173,11 +194,12 @@ struct HomeView: View {
             VStack(spacing: 16) {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Today's Look")
-                            .font(.system(size: 18, weight: .bold))
+                        Text(L10n.homeTodaysLook)
+                            .font(.headline)
+                            .accessibilityAddTraits(.isHeader)
 
                         Text(formattedDate)
-                            .font(.system(size: 13))
+                            .font(.caption)
                             .foregroundStyle(.secondary)
                     }
 
@@ -187,6 +209,7 @@ struct HomeView: View {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 22))
                             .foregroundStyle(.green)
+                            .accessibilityLabel("Outfit logged for today")
                     }
                 }
 
@@ -203,10 +226,12 @@ struct HomeView: View {
                                             .foregroundStyle(.tertiary)
                                     }
                                     .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .accessibilityLabel(L10n.a11yOutfitImage)
                                 } else {
                                     Image(systemName: "tshirt.fill")
                                         .font(.system(size: 28))
                                         .foregroundStyle(.tertiary)
+                                        .accessibilityHidden(true)
                                 }
                             }
                     }
@@ -214,10 +239,12 @@ struct HomeView: View {
                     Button {
                         showDailyOutfit = true
                     } label: {
-                        Text("View Details")
-                            .font(.system(size: 15, weight: .semibold))
+                        Text(L10n.homeViewDetails)
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
                             .foregroundStyle(MirrorTheme.purple)
                     }
+                    .accessibilityHint("Opens your daily outfit details")
                 } else {
                     Button {
                         let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
@@ -227,9 +254,11 @@ struct HomeView: View {
                         HStack(spacing: 10) {
                             Image(systemName: "wand.and.stars")
                                 .font(.system(size: 18))
+                                .accessibilityHidden(true)
 
-                            Text("Generate Today's Look")
-                                .font(.system(size: 16, weight: .bold))
+                            Text(L10n.homeGenerateLook)
+                                .font(.callout)
+                                .fontWeight(.bold)
                         }
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
@@ -239,6 +268,8 @@ struct HomeView: View {
                                 .fill(MirrorTheme.gradientPrimary)
                         )
                     }
+                    .accessibilityLabel(L10n.homeGenerateLook)
+                    .accessibilityHint("Uses AI to suggest an outfit from your wardrobe")
                 }
             }
         }
@@ -265,52 +296,61 @@ struct HomeView: View {
                         .foregroundStyle(.orange)
                         .symbolEffect(.bounce, options: .repeating.speed(0.3))
                 }
+                .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
                         Text("\(appState.streakCount)")
-                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .font(.title)
+                            .fontWeight(.bold)
+                            .fontDesign(.rounded)
                             .foregroundStyle(MirrorTheme.gradientPrimary)
 
-                        Text("day streak")
-                            .font(.system(size: 16, weight: .medium))
+                        Text(L10n.homeDayStreak)
+                            .font(.callout)
+                            .fontWeight(.medium)
                             .foregroundStyle(.secondary)
                     }
 
-                    Text("Keep logging daily outfits!")
-                        .font(.system(size: 13))
+                    Text(L10n.homeKeepLogging)
+                        .font(.caption)
                         .foregroundStyle(.secondary)
                 }
 
                 Spacer()
 
                 VStack(spacing: 2) {
-                    Text("Best")
-                        .font(.system(size: 10, weight: .medium))
+                    Text(L10n.homeBest)
+                        .font(.caption2)
+                        .fontWeight(.medium)
                         .foregroundStyle(.secondary)
                         .textCase(.uppercase)
 
                     Text("\(appState.longestStreak)")
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .font(.title3)
+                        .fontWeight(.bold)
+                        .fontDesign(.rounded)
                         .foregroundStyle(.orange)
                 }
             }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(L10n.streakFlame(appState.streakCount))
     }
 
     // MARK: - Quick Actions
 
     private var quickActionsRow: some View {
         HStack(spacing: 12) {
-            quickAction(icon: "plus.circle.fill", label: "Add Clothes", color: MirrorTheme.purple) {
+            quickAction(icon: "plus.circle.fill", label: L10n.homeAddClothes, color: MirrorTheme.purple) {
                 showAddItem = true
             }
 
-            quickAction(icon: "person.fill.viewfinder", label: "Try On", color: MirrorTheme.pink) {
+            quickAction(icon: "person.fill.viewfinder", label: L10n.homeTryOn, color: MirrorTheme.pink) {
                 // Navigate to try-on
             }
 
-            quickAction(icon: "bubble.left.and.bubble.right.fill", label: "AI Chat", color: MirrorTheme.indigo) {
+            quickAction(icon: "bubble.left.and.bubble.right.fill", label: L10n.homeAIChat, color: MirrorTheme.indigo) {
                 showAIChat = true
             }
         }
@@ -332,11 +372,14 @@ struct HomeView: View {
                         .font(.system(size: 24))
                         .foregroundStyle(color)
                 }
+                .accessibilityHidden(true)
 
                 Text(label)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.caption)
+                    .fontWeight(.semibold)
                     .foregroundStyle(.primary)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
@@ -349,6 +392,8 @@ struct HomeView: View {
                     )
             )
         }
+        .accessibilityLabel(label)
+        .accessibilityAddTraits(.isButton)
     }
 
     // MARK: - Subscription Banner
@@ -361,21 +406,24 @@ struct HomeView: View {
                 Image(systemName: "crown.fill")
                     .font(.system(size: 24))
                     .foregroundStyle(.yellow)
+                    .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Unlock Full Potential")
-                        .font(.system(size: 16, weight: .bold))
+                    Text(L10n.homeUnlockPotential)
+                        .font(.callout)
+                        .fontWeight(.bold)
                         .foregroundStyle(.white)
 
-                    Text("Avatar, unlimited VTON, AI styling & more")
-                        .font(.system(size: 12))
+                    Text(L10n.homeUnlockSubtitle)
+                        .font(.caption2)
                         .foregroundStyle(.white.opacity(0.7))
                 }
 
                 Spacer()
 
-                Text("PRO")
-                    .font(.system(size: 13, weight: .black))
+                Text(L10n.homePro)
+                    .font(.caption)
+                    .fontWeight(.black)
                     .foregroundStyle(.black)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
@@ -390,6 +438,9 @@ struct HomeView: View {
                     .fill(MirrorTheme.gradientPrimary)
             )
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(L10n.homeUnlockPotential)
+        .accessibilityHint("Opens subscription plans")
     }
 
     // MARK: - Notification Button
@@ -410,9 +461,12 @@ struct HomeView: View {
                         .padding(3)
                         .background(Circle().fill(.red))
                         .offset(x: 6, y: -4)
+                        .accessibilityHidden(true)
                 }
             }
         }
+        .accessibilityLabel(L10n.a11yNotificationBell)
+        .accessibilityValue(appState.unreadNotificationCount > 0 ? L10n.notificationCount(appState.unreadNotificationCount) : "No unread notifications")
     }
 
     // MARK: - Refresh

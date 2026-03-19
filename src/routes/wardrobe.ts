@@ -4,6 +4,7 @@ import { authMiddleware } from '../middleware/auth.js';
 import { uploadImage, deleteImage, extractPathFromUrl } from '../services/storage.js';
 import { removeBackground } from '../services/rembg.js';
 import { analyzeImageJSON } from '../services/gemini.js';
+import { logger } from '../services/logger.js';
 import type { AppVariables, WardrobeCategory, Season, Occasion } from '../types/index.js';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -144,7 +145,7 @@ wardrobe.post('/', async (c) => {
       const noBgPath = `${userId}/${itemId}_nobg.png`;
       imageNoBgUrl = await uploadImage('wardrobe', noBgPath, noBgBuffer, 'image/png');
     } catch (bgErr) {
-      console.error('Background removal failed, continuing without:', bgErr);
+      logger.warn({ err: bgErr }, 'Background removal failed, continuing without');
     }
 
     // Use Gemini to analyze the garment
@@ -181,7 +182,7 @@ wardrobe.post('/', async (c) => {
 Return ONLY valid JSON.`
       );
     } catch (aiErr) {
-      console.error('AI garment analysis failed, using provided/default values:', aiErr);
+      logger.warn({ err: aiErr }, 'AI garment analysis failed, using provided/default values');
     }
 
     // Merge user-provided values with AI analysis (user values take precedence)
@@ -416,7 +417,7 @@ wardrobe.delete('/:id', async (c) => {
         try {
           await deleteImage('wardrobe', path);
         } catch {
-          console.error('Failed to delete original image from storage');
+          logger.error('Failed to delete original image from storage');
         }
       }
     }
@@ -427,7 +428,7 @@ wardrobe.delete('/:id', async (c) => {
         try {
           await deleteImage('wardrobe', path);
         } catch {
-          console.error('Failed to delete no-bg image from storage');
+          logger.error('Failed to delete no-bg image from storage');
         }
       }
     }

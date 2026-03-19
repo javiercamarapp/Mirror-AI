@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { supabaseAdmin } from '../services/supabase.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { sendPushNotification } from '../services/pushNotifications.js';
+import { logger } from '../services/logger.js';
 import type { AppVariables } from '../types/index.js';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -169,7 +170,7 @@ friends.post('/request', async (c) => {
     return c.json({ success: true, data: request }, 201);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[Friend Request Error]:', err);
+    logger.error({ err }, 'Friend request failed');
     return c.json({ success: false, error: message }, 500);
   }
 });
@@ -569,7 +570,7 @@ friends.post('/unblock/:userId', async (c) => {
     return c.json({ success: true, data: { message: 'User unblocked successfully' } });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[Unblock Error]:', err);
+    logger.error({ err }, 'Unblock user failed');
     return c.json({ success: false, error: message }, 500);
   }
 });

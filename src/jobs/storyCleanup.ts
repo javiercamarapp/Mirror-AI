@@ -44,16 +44,15 @@ export async function cleanupExpiredStories(): Promise<{
     for (let i = 0; i < expiredIds.length; i += BATCH_SIZE) {
       const batch = expiredIds.slice(i, i + BATCH_SIZE);
 
-      const { count: viewCount, error: viewError } = await supabaseAdmin
+      const { error: viewError } = await supabaseAdmin
         .from('story_views')
         .delete()
-        .in('story_id', batch)
-        .select('id', { count: 'exact', head: true });
+        .in('story_id', batch);
 
       if (viewError) {
         console.error('[StoryCleanup] Failed to delete story views batch:', viewError.message);
       } else {
-        deletedViews += viewCount ?? 0;
+        deletedViews += batch.length;
       }
     }
 
@@ -61,16 +60,15 @@ export async function cleanupExpiredStories(): Promise<{
     for (let i = 0; i < expiredIds.length; i += BATCH_SIZE) {
       const batch = expiredIds.slice(i, i + BATCH_SIZE);
 
-      const { count: storyCount, error: storyError } = await supabaseAdmin
+      const { error: storyError } = await supabaseAdmin
         .from('stories')
         .delete()
-        .in('id', batch)
-        .select('id', { count: 'exact', head: true });
+        .in('id', batch);
 
       if (storyError) {
         console.error('[StoryCleanup] Failed to delete stories batch:', storyError.message);
       } else {
-        deletedStories += storyCount ?? 0;
+        deletedStories += batch.length;
       }
     }
 
