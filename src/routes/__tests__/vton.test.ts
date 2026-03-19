@@ -213,6 +213,9 @@ describe('VTON Routes', () => {
       });
       mockSupabase.from.mockReturnValue(profileChain);
 
+      // rpc for decrement_credits succeeds
+      mockSupabase.rpc.mockResolvedValue({ data: 4, error: null });
+
       mockTryOn.mockRejectedValue(new Error('Fashn API timeout'));
 
       const res = await req('POST', '/generate', {

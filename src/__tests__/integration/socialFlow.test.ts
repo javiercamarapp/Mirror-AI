@@ -294,7 +294,7 @@ describe('Social Flow Integration', () => {
         return callIdx === 1 ? deleteChain : insertChain;
       });
 
-      const res = await req('POST', '/block', { blocked_user_id: 'user-2' }, AUTH);
+      const res = await req('POST', '/block', { blocked_user_id: 'a0000000-0000-4000-a000-000000000002' }, AUTH);
       expect(res.status).toBe(201);
       const json = await res.json();
       expect(json.data.message).toContain('blocked');

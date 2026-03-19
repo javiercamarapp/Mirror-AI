@@ -222,7 +222,7 @@ describe('Avatar Routes', () => {
       const chain = chainMock({ data: { id: 'av-1', user_id: 'user-1', base_image_url: 'https://example.com/avatar.png' }, error: null });
       mockSupabase.from.mockReturnValue(chain);
 
-      const res = await req('GET', '/', undefined, AUTH_HEADER);
+      const res = await req('GET', '', undefined, AUTH_HEADER);
       expect(res.status).toBe(200);
       const json = await res.json();
       expect(json.success).toBe(true);
@@ -233,7 +233,7 @@ describe('Avatar Routes', () => {
       const chain = chainMock({ data: null, error: { code: 'PGRST116' } });
       mockSupabase.from.mockReturnValue(chain);
 
-      const res = await req('GET', '/', undefined, AUTH_HEADER);
+      const res = await req('GET', '', undefined, AUTH_HEADER);
       expect(res.status).toBe(200);
       const json = await res.json();
       expect(json.success).toBe(true);
@@ -242,7 +242,7 @@ describe('Avatar Routes', () => {
     });
 
     it('should return 401 when not authenticated', async () => {
-      const res = await req('GET', '/');
+      const res = await req('GET', '');
       expect(res.status).toBe(401);
     });
   });

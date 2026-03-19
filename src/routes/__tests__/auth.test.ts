@@ -39,6 +39,10 @@ vi.mock('../../services/logger.js', () => ({
   createChildLogger: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() })),
 }));
 
+vi.mock('../../services/redis.js', () => ({
+  getRedisClient: vi.fn(() => null),
+}));
+
 // Helper to build chainable query mock
 function chainMock(returnValue: { data: any; error: any; count?: number }) {
   const chain: any = {};
@@ -58,6 +62,9 @@ const { authRoutes } = await import('../../routes/auth.js');
 
 const app = new Hono<{ Variables: AppVariables }>();
 app.route('/auth', authRoutes);
+
+// Fake JWT-format token (3 base64url segments) for passing format validation
+const FAKE_JWT = 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0LXVzZXIiLCJlbWFpbCI6InRlc3RAdGVzdC5jb20ifQ.ZmFrZS1zaWduYXR1cmU';
 
 function req(method: string, path: string, body?: any, headers?: Record<string, string>) {
   const init: RequestInit = { method, headers: { 'Content-Type': 'application/json', ...headers } };
@@ -91,7 +98,7 @@ describe('Auth Routes', () => {
         return insertChain;
       });
 
-      const res = await req('POST', '/apple', { id_token: 'valid-token', full_name: 'Alice' });
+      const res = await req('POST', '/apple', { id_token: FAKE_JWT, full_name: 'Alice' });
       expect(res.status).toBe(200);
       const json = await res.json();
       expect(json.success).toBe(true);
@@ -113,7 +120,7 @@ describe('Auth Routes', () => {
         error: { message: 'Invalid token' },
       });
 
-      const res = await req('POST', '/apple', { id_token: 'bad-token' });
+      const res = await req('POST', '/apple', { id_token: FAKE_JWT });
       expect(res.status).toBe(401);
       const json = await res.json();
       expect(json.success).toBe(false);
@@ -130,7 +137,7 @@ describe('Auth Routes', () => {
       const profileChain = chainMock({ data: { id: 'user-1' }, error: null });
       mockSupabase.from.mockReturnValue(profileChain);
 
-      const res = await req('POST', '/apple', { id_token: 'tok', full_name: 'New Name' });
+      const res = await req('POST', '/apple', { id_token: FAKE_JWT, full_name: 'New Name' });
       expect(res.status).toBe(200);
     });
   });
@@ -149,7 +156,7 @@ describe('Auth Routes', () => {
       const profileChain = chainMock({ data: { id: 'user-2' }, error: null });
       mockSupabase.from.mockReturnValue(profileChain);
 
-      const res = await req('POST', '/google', { id_token: 'google-token' });
+      const res = await req('POST', '/google', { id_token: FAKE_JWT });
       expect(res.status).toBe(200);
       const json = await res.json();
       expect(json.success).toBe(true);

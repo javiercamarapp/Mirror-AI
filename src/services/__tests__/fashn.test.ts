@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ─── Mock dependencies ──────────────────────────────────────────────────────
 
-vi.mock('../config.js', () => ({
+vi.mock('../../config.js', () => ({
   config: {
     fashnApiKey: 'test-fashn-key',
     nodeEnv: 'test',

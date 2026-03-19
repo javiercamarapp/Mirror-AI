@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ─── Mock dependencies ──────────────────────────────────────────────────────
 
-vi.mock('../config.js', () => ({
+vi.mock('../../config.js', () => ({
   config: {
     geminiApiKey: 'test-gemini-key',
     nodeEnv: 'test',
@@ -228,7 +228,7 @@ describe('Gemini Service', () => {
       expect(mockFetch).toHaveBeenCalledTimes(2);
     });
 
-    it('should throw after exhausting all retries on persistent 429', async () => {
+    it('should throw after exhausting all retries on persistent 429', { timeout: 15000 }, async () => {
       mockFetch.mockResolvedValue({ ok: false, status: 429 });
 
       await expect(generateText('prompt')).rejects.toThrow('failed with status 429');

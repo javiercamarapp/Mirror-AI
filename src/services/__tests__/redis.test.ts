@@ -1,30 +1,37 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// ─── Mock dependencies ──────────────────────────────────────────────────────
-
-vi.mock('../logger.js', () => ({
-  logger: {
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    debug: vi.fn(),
-    child: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() })),
-  },
-  createChildLogger: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() })),
-}));
+// ─── Shared mock state ──────────────────────────────────────────────────────
+const mockWarn = vi.fn();
+const mockInfo = vi.fn();
+const mockError = vi.fn();
+const mockDebug = vi.fn();
 
 const mockPing = vi.fn().mockResolvedValue('PONG');
 const mockQuit = vi.fn().mockResolvedValue('OK');
 const mockOn = vi.fn();
 
-vi.mock('ioredis', () => {
-  return {
-    default: vi.fn().mockImplementation(() => ({
-      ping: mockPing,
-      quit: mockQuit,
-      on: mockOn,
+vi.mock('../logger.js', () => ({
+  logger: {
+    info: (...args: any[]) => mockInfo(...args),
+    warn: (...args: any[]) => mockWarn(...args),
+    error: (...args: any[]) => mockError(...args),
+    debug: (...args: any[]) => mockDebug(...args),
+    child: vi.fn(() => ({
+      info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(),
     })),
-  };
+  },
+  createChildLogger: vi.fn(() => ({
+    info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(),
+  })),
+}));
+
+vi.mock('ioredis', () => {
+  const FakeRedis = vi.fn(function (this: any) {
+    this.ping = mockPing;
+    this.quit = mockQuit;
+    this.on = mockOn;
+  });
+  return { default: FakeRedis };
 });
 
 // ─── Tests ──────────────────────────────────────────────────────────────────
@@ -33,7 +40,6 @@ describe('Redis Service', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    // Reset the module to clear cached redis client
     vi.resetModules();
   });
 
@@ -48,17 +54,6 @@ describe('Redis Service', () => {
   it('should return null when REDIS_URL is not set', async () => {
     delete process.env.REDIS_URL;
 
-    // Re-mock after resetModules
-    vi.mock('../logger.js', () => ({
-      logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), child: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() })) },
-      createChildLogger: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() })),
-    }));
-    vi.mock('ioredis', () => ({
-      default: vi.fn().mockImplementation(() => ({
-        ping: vi.fn(), quit: vi.fn(), on: vi.fn(),
-      })),
-    }));
-
     const { getRedisClient } = await import('../redis.js');
     const client = getRedisClient();
     expect(client).toBeNull();
@@ -67,18 +62,7 @@ describe('Redis Service', () => {
   it('should create Redis client when REDIS_URL is set', async () => {
     process.env.REDIS_URL = 'redis://localhost:6379';
 
-    vi.mock('../logger.js', () => ({
-      logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), child: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() })) },
-      createChildLogger: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() })),
-    }));
-    vi.mock('ioredis', () => ({
-      default: vi.fn().mockImplementation(() => ({
-        ping: vi.fn(), quit: vi.fn(), on: vi.fn(),
-      })),
-    }));
-
     const { getRedisClient } = await import('../redis.js');
-    // Client is created but redisAvailable starts as false until connect event
     const client = getRedisClient();
     // Returns null because redisAvailable is false until connect event fires
     expect(client).toBeNull();
@@ -87,21 +71,10 @@ describe('Redis Service', () => {
   it('should register event listeners on Redis client', async () => {
     process.env.REDIS_URL = 'redis://localhost:6379';
 
-    const localOn = vi.fn();
-    vi.mock('../logger.js', () => ({
-      logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), child: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() })) },
-      createChildLogger: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() })),
-    }));
-    vi.mock('ioredis', () => ({
-      default: vi.fn().mockImplementation(() => ({
-        ping: vi.fn(), quit: vi.fn(), on: localOn,
-      })),
-    }));
-
     const { getRedisClient } = await import('../redis.js');
     getRedisClient();
 
-    const events = localOn.mock.calls.map((c: any[]) => c[0]);
+    const events = mockOn.mock.calls.map((c: any[]) => c[0]);
     expect(events).toContain('connect');
     expect(events).toContain('ready');
     expect(events).toContain('error');
@@ -111,16 +84,6 @@ describe('Redis Service', () => {
   it('should return false from isRedisHealthy when no client exists', async () => {
     delete process.env.REDIS_URL;
 
-    vi.mock('../logger.js', () => ({
-      logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), child: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() })) },
-      createChildLogger: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() })),
-    }));
-    vi.mock('ioredis', () => ({
-      default: vi.fn().mockImplementation(() => ({
-        ping: vi.fn(), quit: vi.fn(), on: vi.fn(),
-      })),
-    }));
-
     const { isRedisHealthy } = await import('../redis.js');
     const healthy = await isRedisHealthy();
     expect(healthy).toBe(false);
@@ -128,19 +91,7 @@ describe('Redis Service', () => {
 
   it('should return false from isRedisHealthy when ping fails', async () => {
     process.env.REDIS_URL = 'redis://localhost:6379';
-
-    const failingPing = vi.fn().mockRejectedValue(new Error('connection lost'));
-    const localOn = vi.fn();
-
-    vi.mock('../logger.js', () => ({
-      logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), child: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() })) },
-      createChildLogger: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() })),
-    }));
-    vi.mock('ioredis', () => ({
-      default: vi.fn().mockImplementation(() => ({
-        ping: failingPing, quit: vi.fn(), on: localOn,
-      })),
-    }));
+    mockPing.mockRejectedValueOnce(new Error('connection lost'));
 
     const { getRedisClient, isRedisHealthy } = await import('../redis.js');
     getRedisClient();
@@ -152,37 +103,14 @@ describe('Redis Service', () => {
   it('should gracefully disconnect via disconnectRedis', async () => {
     process.env.REDIS_URL = 'redis://localhost:6379';
 
-    const localQuit = vi.fn().mockResolvedValue('OK');
-    const localOn = vi.fn();
-
-    vi.mock('../logger.js', () => ({
-      logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), child: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() })) },
-      createChildLogger: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() })),
-    }));
-    vi.mock('ioredis', () => ({
-      default: vi.fn().mockImplementation(() => ({
-        ping: vi.fn(), quit: localQuit, on: localOn,
-      })),
-    }));
-
     const { getRedisClient, disconnectRedis } = await import('../redis.js');
     getRedisClient(); // initialize
     await disconnectRedis();
-    expect(localQuit).toHaveBeenCalled();
+    expect(mockQuit).toHaveBeenCalled();
   });
 
   it('should handle disconnectRedis when no client exists', async () => {
     delete process.env.REDIS_URL;
-
-    vi.mock('../logger.js', () => ({
-      logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), child: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() })) },
-      createChildLogger: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() })),
-    }));
-    vi.mock('ioredis', () => ({
-      default: vi.fn().mockImplementation(() => ({
-        ping: vi.fn(), quit: vi.fn(), on: vi.fn(),
-      })),
-    }));
 
     const { disconnectRedis } = await import('../redis.js');
     // Should not throw
@@ -192,19 +120,8 @@ describe('Redis Service', () => {
   it('should log warning when REDIS_URL is not set', async () => {
     delete process.env.REDIS_URL;
 
-    const warnFn = vi.fn();
-    vi.mock('../logger.js', () => ({
-      logger: { info: vi.fn(), warn: warnFn, error: vi.fn(), debug: vi.fn(), child: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() })) },
-      createChildLogger: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() })),
-    }));
-    vi.mock('ioredis', () => ({
-      default: vi.fn().mockImplementation(() => ({
-        ping: vi.fn(), quit: vi.fn(), on: vi.fn(),
-      })),
-    }));
-
     const { getRedisClient } = await import('../redis.js');
     getRedisClient();
-    expect(warnFn).toHaveBeenCalledWith(expect.stringContaining('REDIS_URL'));
+    expect(mockWarn).toHaveBeenCalledWith(expect.stringContaining('REDIS_URL'));
   });
 });

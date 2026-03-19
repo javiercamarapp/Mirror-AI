@@ -8,6 +8,7 @@ const mockSupabase = {
     getUser: vi.fn(),
   },
   from: vi.fn(),
+  rpc: vi.fn(),
 };
 
 vi.mock('../../services/supabase.js', () => ({
@@ -393,18 +394,21 @@ describe('Subscription Routes', () => {
         data: { id: 'pack-1', product_id: 'com.mirrorai.credits.10', credits: 10, active: true },
         error: null,
       });
-      const profileChain = chainMock({ data: { vton_credits: 5 }, error: null });
-      const updateChain = chainMock({ data: null, error: null });
-      const purchaseChain = chainMock({ data: null, error: null });
+      // Idempotency check - no existing purchase
+      const existingPurchaseChain = chainMock({ data: null, error: null });
+      // Insert purchase record
+      const purchaseInsertChain = chainMock({ data: null, error: null });
 
       let callIdx = 0;
       mockSupabase.from.mockImplementation(() => {
         callIdx++;
         if (callIdx === 1) return packChain;
-        if (callIdx === 2) return profileChain;
-        if (callIdx === 3) return updateChain;
-        return purchaseChain;
+        if (callIdx === 2) return existingPurchaseChain;
+        return purchaseInsertChain;
       });
+
+      // rpc for increment_credits_atomic returns new total
+      mockSupabase.rpc.mockResolvedValue({ data: 15, error: null });
 
       const res = await req('POST', '/purchases/credits', {
         product_id: 'com.mirrorai.credits.10',

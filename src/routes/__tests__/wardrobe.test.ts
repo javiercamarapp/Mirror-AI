@@ -6,6 +6,7 @@ import type { AppVariables } from '../../types/index.js';
 const mockSupabase = {
   auth: { getUser: vi.fn() },
   from: vi.fn(),
+  rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
 };
 
 vi.mock('../../services/supabase.js', () => ({
@@ -36,6 +37,15 @@ vi.mock('../../services/rembg.js', () => ({
   removeBackground: vi.fn().mockResolvedValue(Buffer.from('nobg')),
 }));
 
+vi.mock('sharp', () => {
+  const mockSharp = vi.fn(() => ({
+    withMetadata: vi.fn().mockReturnThis(),
+    jpeg: vi.fn().mockReturnThis(),
+    toBuffer: vi.fn().mockResolvedValue(Buffer.from('processed-image')),
+  }));
+  return { default: mockSharp };
+});
+
 vi.mock('../../services/gemini.js', () => ({
   analyzeImageJSON: vi.fn().mockResolvedValue({
     name: 'Blue T-Shirt',
@@ -56,8 +66,8 @@ function chainMock(returnValue: { data: any; error: any; count?: number | null }
   const chain: any = {};
   const methods = [
     'select', 'insert', 'update', 'delete',
-    'eq', 'neq', 'or', 'in', 'ilike', 'contains', 'not', 'gt',
-    'order', 'limit', 'range',
+    'eq', 'neq', 'or', 'in', 'is', 'ilike', 'contains', 'not', 'gt',
+    'order', 'limit', 'range', 'head',
   ];
   for (const m of methods) {
     chain[m] = vi.fn(() => chain);

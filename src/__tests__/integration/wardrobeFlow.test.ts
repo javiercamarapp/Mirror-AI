@@ -160,7 +160,7 @@ describe('Wardrobe Flow Integration', () => {
       const res = await req('POST', '/wardrobe', {}, AUTH);
       expect(res.status).toBe(400);
       const json = await res.json();
-      expect(json.error).toContain('image');
+      expect(json.error).toContain('Validation failed');
     });
   });
 

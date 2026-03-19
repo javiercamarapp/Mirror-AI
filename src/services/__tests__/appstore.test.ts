@@ -5,6 +5,12 @@ vi.mock('../logger.js', () => ({
   createChildLogger: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() })),
 }));
 
+vi.mock('../../config.js', () => ({
+  config: {
+    apnsBundleId: 'com.mirrorai.app',
+  },
+}));
+
 // Since verifyTransaction/verifySignedPayload depend on jose JWS verification
 // and crypto X509Certificate chain verification (which are hard to mock at the
 // native module level), we test the exported functions by mocking jose and

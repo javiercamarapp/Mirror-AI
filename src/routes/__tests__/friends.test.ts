@@ -377,7 +377,7 @@ describe('Friends Routes', () => {
         error: null,
       });
       const friendshipChain = chainMock({
-        data: { id: 'fs-bob', status: 'accepted', requester_id: 'user-f-1' },
+        data: [{ id: 'fs-bob', status: 'accepted', requester_id: 'user-f-1', addressee_id: 'found-2' }],
         error: null,
       });
 

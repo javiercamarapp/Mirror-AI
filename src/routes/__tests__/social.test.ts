@@ -6,6 +6,7 @@ import type { AppVariables } from '../../types/index.js';
 const mockSupabase = {
   auth: { getUser: vi.fn() },
   from: vi.fn(),
+  rpc: vi.fn(),
 };
 
 vi.mock('../../services/supabase.js', () => ({
@@ -47,7 +48,7 @@ function chainMock(returnValue: { data: any; error: any; count?: number | null }
   const chain: any = {};
   const methods = [
     'select', 'insert', 'update', 'delete', 'upsert',
-    'eq', 'neq', 'or', 'in', 'not', 'gt', 'ilike', 'contains',
+    'eq', 'neq', 'or', 'in', 'not', 'gt', 'is', 'ilike', 'contains',
     'single', 'maybeSingle', 'order', 'limit', 'range',
   ];
   for (const m of methods) {
@@ -85,6 +86,8 @@ describe('Social Routes', () => {
       const friendshipsChain = chainMock({ data: [{ requester_id: 'user-social-1', addressee_id: 'friend-1' }], error: null });
       // blocks
       const blocksChain = chainMock({ data: [], error: null });
+      // hidden posts
+      const hiddenChain = chainMock({ data: [], error: null });
       // posts
       const postsChain = chainMock({
         data: [
@@ -101,7 +104,8 @@ describe('Social Routes', () => {
         callIdx++;
         if (callIdx === 1) return friendshipsChain;
         if (callIdx === 2) return blocksChain;
-        if (callIdx === 3) return postsChain;
+        if (callIdx === 3) return hiddenChain;
+        if (callIdx === 4) return postsChain;
         return likesChain;
       });
 
@@ -116,12 +120,14 @@ describe('Social Routes', () => {
     it('should respect pagination params', async () => {
       const friendshipsChain = chainMock({ data: [], error: null });
       const blocksChain = chainMock({ data: [], error: null });
+      const hiddenChain = chainMock({ data: [], error: null });
       const postsChain = chainMock({ data: [], error: null, count: 0 });
       let callIdx = 0;
       mockSupabase.from.mockImplementation(() => {
         callIdx++;
         if (callIdx === 1) return friendshipsChain;
         if (callIdx === 2) return blocksChain;
+        if (callIdx === 3) return hiddenChain;
         return postsChain;
       });
 
@@ -135,12 +141,14 @@ describe('Social Routes', () => {
     it('should cap limit at 50', async () => {
       const friendshipsChain = chainMock({ data: [], error: null });
       const blocksChain = chainMock({ data: [], error: null });
+      const hiddenChain = chainMock({ data: [], error: null });
       const postsChain = chainMock({ data: [], error: null, count: 0 });
       let callIdx = 0;
       mockSupabase.from.mockImplementation(() => {
         callIdx++;
         if (callIdx === 1) return friendshipsChain;
         if (callIdx === 2) return blocksChain;
+        if (callIdx === 3) return hiddenChain;
         return postsChain;
       });
 
@@ -161,6 +169,7 @@ describe('Social Routes', () => {
         data: [{ requester_id: 'user-social-1', addressee_id: 'friend-2' }],
         error: null,
       });
+      const hiddenChain = chainMock({ data: [], error: null });
       const postsChain = chainMock({ data: [], error: null, count: 0 });
 
       let callIdx = 0;
@@ -168,6 +177,7 @@ describe('Social Routes', () => {
         callIdx++;
         if (callIdx === 1) return friendshipsChain;
         if (callIdx === 2) return blocksChain;
+        if (callIdx === 3) return hiddenChain;
         return postsChain;
       });
 
@@ -219,21 +229,20 @@ describe('Social Routes', () => {
   describe('POST /social/posts/:id/like', () => {
     it('should like a post when not already liked', async () => {
       const existingChain = chainMock({ data: null, error: null });
-      const insertChain = chainMock({ data: null, error: null });
-      const postChain = chainMock({ data: { likes_count: 5, user_id: 'other-user' }, error: null });
-      const updateChain = chainMock({ data: null, error: null });
+      const postChain = chainMock({ data: { user_id: 'other-user' }, error: null });
       const profileChain = chainMock({ data: { full_name: 'Liker' }, error: null });
       const notifChain = chainMock({ data: null, error: null });
+
+      // rpc for atomic_like_post
+      mockSupabase.rpc.mockResolvedValue({ data: null, error: null });
 
       let callIdx = 0;
       mockSupabase.from.mockImplementation(() => {
         callIdx++;
-        if (callIdx === 1) return existingChain;
-        if (callIdx === 2) return insertChain;
-        if (callIdx === 3) return postChain;
-        if (callIdx === 4) return updateChain;
-        if (callIdx === 5) return profileChain;
-        return notifChain;
+        if (callIdx === 1) return existingChain; // post_likes check
+        if (callIdx === 2) return postChain; // social_posts for notification
+        if (callIdx === 3) return profileChain; // user_profiles for liker name
+        return notifChain; // notifications insert
       });
 
       const res = await req('POST', '/posts/post-1/like', {}, AUTH);
@@ -244,18 +253,11 @@ describe('Social Routes', () => {
 
     it('should unlike a post when already liked', async () => {
       const existingChain = chainMock({ data: { id: 'like-1' }, error: null });
-      const deleteChain = chainMock({ data: null, error: null });
-      const postChain = chainMock({ data: { likes_count: 5 }, error: null });
-      const updateChain = chainMock({ data: null, error: null });
 
-      let callIdx = 0;
-      mockSupabase.from.mockImplementation(() => {
-        callIdx++;
-        if (callIdx === 1) return existingChain;
-        if (callIdx === 2) return deleteChain;
-        if (callIdx === 3) return postChain;
-        return updateChain;
-      });
+      // rpc for atomic_unlike_post
+      mockSupabase.rpc.mockResolvedValue({ data: null, error: null });
+
+      mockSupabase.from.mockReturnValue(existingChain);
 
       const res = await req('POST', '/posts/post-1/like', {}, AUTH);
       expect(res.status).toBe(200);
@@ -273,17 +275,18 @@ describe('Social Routes', () => {
         error: null,
       });
       const postChain = chainMock({ data: { comments_count: 2, user_id: 'other-user' }, error: null });
-      const updateChain = chainMock({ data: null, error: null });
       const profileChain = chainMock({ data: { full_name: 'Commenter' }, error: null });
       const notifChain = chainMock({ data: null, error: null });
+
+      // rpc for increment_post_comments
+      mockSupabase.rpc.mockResolvedValue({ data: null, error: null });
 
       let callIdx = 0;
       mockSupabase.from.mockImplementation(() => {
         callIdx++;
         if (callIdx === 1) return insertChain;
         if (callIdx === 2) return postChain;
-        if (callIdx === 3) return updateChain;
-        if (callIdx === 4) return profileChain;
+        if (callIdx === 3) return profileChain;
         return notifChain;
       });
 
@@ -307,14 +310,15 @@ describe('Social Routes', () => {
         error: null,
       });
       const postChain = chainMock({ data: { comments_count: 0, user_id: 'user-social-1' }, error: null });
-      const updateChain = chainMock({ data: null, error: null });
+
+      // rpc for increment_post_comments
+      mockSupabase.rpc.mockResolvedValue({ data: null, error: null });
 
       let callIdx = 0;
       mockSupabase.from.mockImplementation(() => {
         callIdx++;
         if (callIdx === 1) return insertChain;
-        if (callIdx === 2) return postChain;
-        return updateChain;
+        return postChain;
       });
 
       const res = await req('POST', '/posts/post-1/comments', { content: '<script>alert("xss")</script>clean text' }, AUTH);
@@ -344,31 +348,27 @@ describe('Social Routes', () => {
 
   describe('DELETE /social/posts/:id', () => {
     it('should delete own post', async () => {
-      const fetchChain = chainMock({ data: { id: 'post-del', user_id: 'user-social-1' }, error: null });
-      const deleteChain = chainMock({ data: null, error: null });
-
-      let callIdx = 0;
-      mockSupabase.from.mockImplementation(() => {
-        callIdx++;
-        if (callIdx === 1) return fetchChain;
-        return deleteChain;
-      });
+      // rpc('soft_delete_post') returns true (success)
+      mockSupabase.rpc.mockResolvedValue({ data: true, error: null });
+      // from('post_comments') for soft-deleting associated comments
+      const commentsChain = chainMock({ data: null, error: null });
+      mockSupabase.from.mockReturnValue(commentsChain);
 
       const res = await req('DELETE', '/posts/post-del', undefined, AUTH);
       expect(res.status).toBe(200);
     });
 
     it('should return 403 when deleting another users post', async () => {
-      const chain = chainMock({ data: { id: 'post-other', user_id: 'other-user' }, error: null });
-      mockSupabase.from.mockReturnValue(chain);
+      // rpc('soft_delete_post') returns false (not owned or not found)
+      mockSupabase.rpc.mockResolvedValue({ data: false, error: null });
 
       const res = await req('DELETE', '/posts/post-other', undefined, AUTH);
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(404);
     });
 
     it('should return 404 when post not found', async () => {
-      const chain = chainMock({ data: null, error: { code: 'PGRST116' } });
-      mockSupabase.from.mockReturnValue(chain);
+      // rpc('soft_delete_post') returns false
+      mockSupabase.rpc.mockResolvedValue({ data: false, error: null });
 
       const res = await req('DELETE', '/posts/nonexistent', undefined, AUTH);
       expect(res.status).toBe(404);
@@ -421,7 +421,7 @@ describe('Social Routes', () => {
         return callIdx === 1 ? deleteChain : insertChain;
       });
 
-      const res = await req('POST', '/block', { blocked_user_id: 'bad-user' }, AUTH);
+      const res = await req('POST', '/block', { blocked_user_id: 'a0000000-0000-4000-a000-000000000002' }, AUTH);
       expect(res.status).toBe(201);
     });
 
@@ -429,7 +429,7 @@ describe('Social Routes', () => {
       const res = await req('POST', '/block', { blocked_user_id: 'user-social-1' }, AUTH);
       expect(res.status).toBe(400);
       const json = await res.json();
-      expect(json.error).toContain('yourself');
+      expect(json.error).toContain('Validation failed');
     });
 
     it('should return 400 when blocked_user_id is missing', async () => {

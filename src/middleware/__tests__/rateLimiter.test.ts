@@ -123,7 +123,16 @@ describe('rateLimiter', () => {
   });
 
   it('should use userId as identifier when authenticated', async () => {
-    const app = createApp({ plan: 'free' });
+    const uniqueUserId = `user-auth-test-${Date.now()}`;
+    const app = new Hono<{ Variables: AppVariables }>();
+    app.use('*', async (c, next) => {
+      c.set('subscriptionPlan' as never, 'free' as never);
+      c.set('userId', uniqueUserId);
+      await next();
+    });
+    app.use('*', rateLimiter);
+    app.get('/test', (c) => c.json({ success: true }));
+
     // Requests from same user but different IPs should share limits
     const res1 = await app.request('http://localhost/test', {
       headers: { 'x-forwarded-for': '1.1.1.1' },
