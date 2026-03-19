@@ -145,7 +145,7 @@ describe('Wardrobe Routes', () => {
     });
 
     it('should reject color filter longer than 50 characters', async () => {
-      const res = await req('GET', `/?color=${'a'.repeat(51)}`, undefined, AUTH);
+      const res = await req('GET', `?color=${'a'.repeat(51)}`, undefined, AUTH);
       expect(res.status).toBe(400);
     });
 
