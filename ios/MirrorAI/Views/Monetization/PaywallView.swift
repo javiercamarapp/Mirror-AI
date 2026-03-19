@@ -7,6 +7,7 @@ struct PaywallView: View {
     @State private var scaleEffect: CGFloat = 0.85
     @State private var bgOpacity: Double = 0
     @State private var contentOpacity: Double = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var pulseAnimation = false
 
     private let features = [
@@ -155,15 +156,22 @@ struct PaywallView: View {
             .opacity(contentOpacity)
         }
         .onAppear {
-            withAnimation(.easeOut(duration: 0.25)) {
+            if reduceMotion {
                 bgOpacity = 1
-            }
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
                 scaleEffect = 1.0
                 contentOpacity = 1.0
-            }
-            withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
-                pulseAnimation = true
+                pulseAnimation = false
+            } else {
+                withAnimation(.easeOut(duration: 0.25)) {
+                    bgOpacity = 1
+                }
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
+                    scaleEffect = 1.0
+                    contentOpacity = 1.0
+                }
+                withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+                    pulseAnimation = true
+                }
             }
         }
         .sheet(isPresented: $showSubscription) {

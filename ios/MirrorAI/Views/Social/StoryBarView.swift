@@ -75,12 +75,14 @@ struct StoryBarView: View {
                 }
 
                 Text("Your Story")
-                    .font(.system(size: 11))
+                    .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
             .frame(width: 76)
         }
+        .accessibilityLabel("Create your story")
+        .accessibilityAddTraits(.isButton)
     }
 
     // MARK: - Story Avatar
@@ -125,10 +127,13 @@ struct StoryBarView: View {
             }
 
             Text(group.user?.username ?? group.user?.fullName ?? "User")
-                .font(.system(size: 11))
+                .font(.caption2)
                 .foregroundStyle(group.hasUnviewed ? .primary : .secondary)
                 .lineLimit(1)
         }
         .frame(width: 76)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(group.user?.username ?? group.user?.fullName ?? "User") story, \(group.hasUnviewed ? "unviewed" : "viewed")")
+        .accessibilityAddTraits(.isButton)
     }
 }

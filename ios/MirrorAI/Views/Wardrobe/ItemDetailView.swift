@@ -391,6 +391,8 @@ struct ItemDetailView: View {
                 .foregroundStyle(item.isFavorite ? .red : .primary)
                 .symbolEffect(.bounce, value: item.isFavorite)
         }
+        .accessibilityLabel(L10n.a11yFavoriteButton)
+        .accessibilityValue(item.isFavorite ? L10n.a11yFavorited : L10n.a11yNotFavorited)
     }
 
     // MARK: - Helpers

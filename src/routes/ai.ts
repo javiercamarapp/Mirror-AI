@@ -3,6 +3,7 @@ import { supabaseAdmin } from '../services/supabase.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { getUserPlan, checkAIChatLimit } from '../middleware/subscription.js';
 import { generateText, generateJSON, analyzeImageJSON } from '../services/gemini.js';
+import { logger } from '../services/logger.js';
 import type { AppVariables } from '../types/index.js';
 
 const ai = new Hono<{ Variables: AppVariables }>();
@@ -157,7 +158,7 @@ ${wardrobeSummary}`;
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[AI Chat Error]:', err);
+    logger.error({ err }, 'AI chat failed');
     return c.json({ success: false, error: message }, 500);
   }
 });
@@ -250,7 +251,7 @@ Return JSON with:
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[AI Analyze Outfit Error]:', err);
+    logger.error({ err }, 'AI outfit analysis failed');
     return c.json({ success: false, error: message }, 500);
   }
 });
@@ -317,7 +318,7 @@ Return JSON with:
     return c.json({ success: true, data: analysis });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[AI Color Analysis Error]:', err);
+    logger.error({ err }, 'AI color analysis failed');
     return c.json({ success: false, error: message }, 500);
   }
 });
@@ -384,7 +385,7 @@ Return JSON with:
     return c.json({ success: true, data: analysis });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[AI Identify Garment Error]:', err);
+    logger.error({ err }, 'AI garment identification failed');
     return c.json({ success: false, error: message }, 500);
   }
 });
@@ -496,7 +497,7 @@ Return JSON with:
     return c.json({ success: true, data: recommendations });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[AI Shopping Recs Error]:', err);
+    logger.error({ err }, 'AI shopping recommendations failed');
     return c.json({ success: false, error: message }, 500);
   }
 });

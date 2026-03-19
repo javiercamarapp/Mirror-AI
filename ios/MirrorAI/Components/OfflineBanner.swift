@@ -7,15 +7,20 @@ struct OfflineBanner: View {
         if !networkMonitor.isConnected {
             HStack(spacing: 8) {
                 Image(systemName: "wifi.slash")
-                    .font(.system(size: 14))
-                Text("No internet connection")
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.subheadline)
+                    .accessibilityHidden(true)
+                Text(L10n.offlineNoConnection)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
             }
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 10)
             .background(Color.red.opacity(0.9))
             .transition(.move(edge: .top).combined(with: .opacity))
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(L10n.offlineNoConnection)
+            .accessibilityAddTraits(.isStaticText)
         }
     }
 }

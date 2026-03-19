@@ -8,6 +8,7 @@ struct AIStylistChatView: View {
     @State private var inputText = ""
     @State private var isTyping = false
     @State private var showClearConfirmation = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var isInputFocused: Bool
 
     struct ChatMessage: Identifiable {
@@ -39,8 +40,9 @@ struct AIStylistChatView: View {
                 inputBar
             }
             .background(Color(UIColor.systemBackground))
-            .navigationTitle("AI Stylist")
+            .navigationTitle(L10n.tabHome == "Home" ? "AI Stylist" : "AI Stylist")
             .navigationBarTitleDisplayMode(.inline)
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Close") { dismiss() }
@@ -54,6 +56,7 @@ struct AIStylistChatView: View {
                             .font(.system(size: 14))
                     }
                     .disabled(messages.isEmpty)
+                    .accessibilityLabel(L10n.a11yDeleteChat)
                     .confirmationDialog("Clear Chat", isPresented: $showClearConfirmation, titleVisibility: .visible) {
                         Button("Clear All Messages", role: .destructive) {
                             messages.removeAll()
@@ -288,6 +291,7 @@ struct AIStylistChatView: View {
                 }
             }
             .disabled(inputText.trimmingCharacters(in: .whitespaces).isEmpty || isTyping)
+            .accessibilityLabel(L10n.a11ySendMessage)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)

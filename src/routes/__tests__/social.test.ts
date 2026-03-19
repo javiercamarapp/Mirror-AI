@@ -21,6 +21,23 @@ vi.mock('../../middleware/auth.js', () => ({
   }),
 }));
 
+vi.mock('../../services/logger.js', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), child: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() })) },
+  createChildLogger: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() })),
+}));
+
+vi.mock('../../services/pushNotifications.js', () => ({
+  sendPushNotification: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../../services/contentModeration.js', () => ({
+  processReports: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../../middleware/moderation.js', () => ({
+  moderationMiddleware: vi.fn(async (_c: any, next: any) => { await next(); }),
+}));
+
 vi.mock('uuid', () => ({
   v4: vi.fn(() => 'mock-uuid'),
 }));

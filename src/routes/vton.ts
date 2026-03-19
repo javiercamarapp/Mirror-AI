@@ -3,6 +3,7 @@ import { supabaseAdmin } from '../services/supabase.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { tryOn } from '../services/fashn.js';
 import { uploadImage } from '../services/storage.js';
+import { logger } from '../services/logger.js';
 import type { AppVariables } from '../types/index.js';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -78,7 +79,7 @@ vton.post('/generate', async (c) => {
         storedUrl = await uploadImage('outfits', storagePath, buffer, 'image/png');
       }
     } catch (storageErr) {
-      console.error('Failed to persist VTON result to storage, using original URL:', storageErr);
+      logger.warn({ err: storageErr }, 'Failed to persist VTON result to storage, using original URL');
     }
 
     // Decrement credit atomically using database function to prevent race conditions
@@ -107,7 +108,7 @@ vton.post('/generate', async (c) => {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[VTON Generate Error]:', err);
+    logger.error({ err }, 'VTON generation failed');
     return c.json({ success: false, error: message }, 500);
   }
 });

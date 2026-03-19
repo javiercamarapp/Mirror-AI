@@ -21,6 +21,11 @@ vi.mock('../../middleware/auth.js', () => ({
   }),
 }));
 
+vi.mock('../../services/logger.js', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), child: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() })) },
+  createChildLogger: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() })),
+}));
+
 vi.mock('../../services/storage.js', () => ({
   uploadImage: vi.fn().mockResolvedValue('https://storage.test/wardrobe/img.jpg'),
   deleteImage: vi.fn().mockResolvedValue(undefined),

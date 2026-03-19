@@ -34,6 +34,11 @@ vi.mock('../../middleware/auth.js', () => ({
   }),
 }));
 
+vi.mock('../../services/logger.js', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), child: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() })) },
+  createChildLogger: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() })),
+}));
+
 // Helper to build chainable query mock
 function chainMock(returnValue: { data: any; error: any; count?: number }) {
   const chain: any = {};

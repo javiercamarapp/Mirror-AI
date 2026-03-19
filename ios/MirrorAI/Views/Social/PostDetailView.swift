@@ -11,6 +11,7 @@ struct PostDetailView: View {
     @State private var isLoadingComments = false
     @State private var isSendingComment = false
     @State private var showHeartAnimation = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var heartScale: CGFloat = 0
     @State private var heartOpacity: Double = 0
     @State private var showError = false
@@ -205,6 +206,8 @@ struct PostDetailView: View {
                     .foregroundStyle(currentPost.isLiked == true ? MirrorTheme.pink : .primary)
                     .contentTransition(.symbolEffect(.replace))
             }
+            .accessibilityLabel(L10n.a11yLikeButton)
+            .accessibilityValue(currentPost.isLiked == true ? L10n.a11yLiked : L10n.a11yUnliked)
 
             Button {
                 isCommentFieldFocused = true
@@ -213,12 +216,14 @@ struct PostDetailView: View {
                     .font(.system(size: 22))
                     .foregroundStyle(.primary)
             }
+            .accessibilityLabel(L10n.a11yCommentButton)
 
             Button {} label: {
                 Image(systemName: "paperplane")
                     .font(.system(size: 21))
                     .foregroundStyle(.primary)
             }
+            .accessibilityLabel(L10n.a11yShareButton)
 
             Spacer()
 
@@ -227,6 +232,7 @@ struct PostDetailView: View {
                     .font(.system(size: 21))
                     .foregroundStyle(.primary)
             }
+            .accessibilityLabel(L10n.a11yBookmarkButton)
         }
     }
 

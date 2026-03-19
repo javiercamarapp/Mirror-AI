@@ -10,6 +10,7 @@ struct AvatarView: View {
     @State private var showPaywall = false
     @State private var isGenerating = false
     @State private var avatarImageUrl: String?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var pulseAnimation = false
 
     private let styles: [(id: String, name: String, icon: String)] = [
@@ -56,6 +57,7 @@ struct AvatarView: View {
             }
             .navigationTitle("My Avatar")
             .navigationBarTitleDisplayMode(.large)
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
             .sheet(isPresented: $showCustomizer) {
                 AvatarCustomizerView()
             }
@@ -83,8 +85,9 @@ struct AvatarView: View {
                     )
                 )
                 .frame(width: 360, height: 360)
-                .scaleEffect(pulseAnimation ? 1.05 : 0.95)
+                .scaleEffect(reduceMotion ? 1.0 : (pulseAnimation ? 1.05 : 0.95))
                 .onAppear {
+                    guard !reduceMotion else { return }
                     withAnimation(.easeInOut(duration: 3).repeatForever(autoreverses: true)) {
                         pulseAnimation = true
                     }

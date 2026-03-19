@@ -23,10 +23,12 @@ struct PremiumBadge: View {
     private var standardBadge: some View {
         HStack(spacing: 5) {
             Image(systemName: "crown.fill")
-                .font(.system(size: 11))
+                .font(.caption2)
+                .accessibilityHidden(true)
 
             Text("PRO")
-                .font(.system(size: 11, weight: .black))
+                .font(.caption2)
+                .fontWeight(.black)
         }
         .foregroundStyle(Color(hex: "1a0533"))
         .padding(.horizontal, 10)
@@ -41,12 +43,15 @@ struct PremiumBadge: View {
                     )
                 )
         )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(L10n.a11yPremiumBadge)
     }
 
     private var compactBadge: some View {
         HStack(spacing: 3) {
             Image(systemName: "crown.fill")
                 .font(.system(size: 9))
+                .accessibilityHidden(true)
 
             Text("PRO")
                 .font(.system(size: 9, weight: .black))
@@ -64,12 +69,15 @@ struct PremiumBadge: View {
                     )
                 )
         )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(L10n.a11yPremiumBadge)
     }
 
     private var largeBadge: some View {
         HStack(spacing: 8) {
             Image(systemName: "crown.fill")
                 .font(.system(size: 16))
+                .accessibilityHidden(true)
 
             Text("PREMIUM")
                 .font(.system(size: 14, weight: .black))
@@ -88,5 +96,7 @@ struct PremiumBadge: View {
                 )
                 .shadow(color: Color(hex: "FFD700").opacity(0.4), radius: 8, y: 2)
         )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(L10n.a11yPremiumBadge)
     }
 }

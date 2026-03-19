@@ -62,6 +62,12 @@ const ENV_SCHEMA = {
   // CORS
   allowedOrigins:     stringVar('ALLOWED_ORIGINS', { default: '*' }),
 
+  // APNs Push Notifications (optional — push disabled without these)
+  apnsKeyId:          stringVar('APNS_KEY_ID', { default: '' }),
+  apnsTeamId:         stringVar('APNS_TEAM_ID', { default: '' }),
+  apnsBundleId:       stringVar('APNS_BUNDLE_ID', { default: '' }),
+  apnsAuthKey:        stringVar('APNS_AUTH_KEY', { default: '' }),
+
   // Feature flags
   enableAnalytics:    boolVar('ENABLE_ANALYTICS', { default: true }),
 } as const;

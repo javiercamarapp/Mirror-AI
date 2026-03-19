@@ -283,6 +283,8 @@ struct SettingsView: View {
 
     private func clearImageCache() {
         URLCache.shared.removeAllCachedResponses()
+        ImageCache.shared.removeAll()
+        DiskImageCache.shared.removeAll()
         let impact = UINotificationFeedbackGenerator()
         impact.notificationOccurred(.success)
     }

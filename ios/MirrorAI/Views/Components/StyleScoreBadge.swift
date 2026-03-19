@@ -4,6 +4,7 @@ struct StyleScoreBadge: View {
     let score: Double
     let tier: String
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var sparklePhase = false
 
     var body: some View {
@@ -18,7 +19,7 @@ struct StyleScoreBadge: View {
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.white)
 
-                if tier == "Diamante" {
+                if tier == "Diamante" && !reduceMotion {
                     Image(systemName: "sparkle")
                         .font(.system(size: 8))
                         .foregroundStyle(.white)
@@ -27,14 +28,18 @@ struct StyleScoreBadge: View {
                         .opacity(sparklePhase ? 1 : 0.3)
                 }
             }
+            .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(tier)
-                    .font(.system(size: 12, weight: .bold))
+                    .font(.caption)
+                    .fontWeight(.bold)
                     .foregroundStyle(tierColor)
 
                 Text(String(format: "%.0f", score))
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .font(.caption2)
+                    .fontWeight(.medium)
+                    .fontDesign(.rounded)
                     .foregroundStyle(.secondary)
             }
         }
@@ -49,12 +54,14 @@ struct StyleScoreBadge: View {
                 )
         )
         .onAppear {
-            if tier == "Diamante" {
+            if tier == "Diamante" && !reduceMotion {
                 withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true)) {
                     sparklePhase = true
                 }
             }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(L10n.styleScore(String(format: "%.0f", score), tier))
     }
 
     private var tierColor: Color {

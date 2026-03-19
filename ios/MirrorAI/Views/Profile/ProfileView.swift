@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ProfileView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var showEditProfile = false
     @State private var showSettings = false
@@ -28,9 +29,14 @@ struct ProfileView: View {
                         .scaleEffect(headerScale)
                         .opacity(headerOpacity)
                         .onAppear {
-                            withAnimation(.spring(response: 0.6, dampingFraction: 0.75)) {
+                            if reduceMotion {
                                 headerScale = 1.0
                                 headerOpacity = 1.0
+                            } else {
+                                withAnimation(.spring(response: 0.6, dampingFraction: 0.75)) {
+                                    headerScale = 1.0
+                                    headerOpacity = 1.0
+                                }
                             }
                         }
 
@@ -51,7 +57,7 @@ struct ProfileView: View {
                 .padding(.bottom, 100)
             }
             .background(Color(UIColor.systemBackground))
-            .navigationTitle("Profile")
+            .navigationTitle(L10n.profileTitle)
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -69,9 +75,12 @@ struct ProfileView: View {
                                     .padding(3)
                                     .background(Circle().fill(.red))
                                     .offset(x: 8, y: -6)
+                                    .accessibilityHidden(true)
                             }
                         }
                     }
+                    .accessibilityLabel(L10n.a11yNotificationBell)
+                    .accessibilityValue(appState.unreadNotificationCount > 0 ? L10n.notificationCount(appState.unreadNotificationCount) : "No unread notifications")
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
@@ -81,6 +90,7 @@ struct ProfileView: View {
                         Image(systemName: "gearshape.fill")
                             .font(.system(size: 17))
                     }
+                    .accessibilityLabel(L10n.settingsTitle)
                 }
             }
             .sheet(isPresented: $showEditProfile) {
@@ -102,6 +112,7 @@ struct ProfileView: View {
                 await appState.loadProfile()
                 await appState.loadNotifications()
             }
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         }
     }
 
@@ -127,10 +138,12 @@ struct ProfileView: View {
                     }
                     .frame(width: 96, height: 96)
                     .clipShape(Circle())
+                    .accessibilityLabel(L10n.userAvatar(appState.currentUser?.name ?? "User"))
                 } else {
                     Image(systemName: "person.fill")
                         .font(.system(size: 36))
                         .foregroundStyle(MirrorTheme.gradientPrimary)
+                        .accessibilityHidden(true)
                 }
 
                 // Edit button overlay
@@ -145,26 +158,30 @@ struct ProfileView: View {
                         .background(Circle().fill(Color(UIColor.systemBackground)).frame(width: 24, height: 24))
                 }
                 .offset(x: 38, y: 38)
+                .accessibilityLabel(L10n.a11yEditProfile)
+                .accessibilityHint("Opens profile editor")
             }
 
             VStack(spacing: 4) {
-                Text(appState.currentUser?.name ?? "Your Name")
-                    .font(.system(size: 24, weight: .bold))
+                Text(appState.currentUser?.name ?? L10n.profileYourPosts)
+                    .font(.title2)
+                    .fontWeight(.bold)
 
                 if let email = appState.currentUser?.email {
                     Text(email)
-                        .font(.system(size: 14))
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
             }
         }
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: - Stats Grid
 
     private var statsGrid: some View {
         HStack(spacing: 12) {
-            statCard(value: "\(appState.wardrobeItems.count)", label: "Wardrobe", icon: "tshirt.fill", color: MirrorTheme.purple)
+            statCard(value: "\(appState.wardrobeItems.count)", label: L10n.tabWardrobe, icon: "tshirt.fill", color: MirrorTheme.purple)
             statCard(value: "\(appState.savedOutfits.count)", label: "Outfits", icon: "rectangle.stack.fill", color: MirrorTheme.pink)
             statCard(value: "\(appState.streakCount)", label: "Streak", icon: "flame.fill", color: .orange)
             statCard(value: String(format: "%.0f", appState.styleScore), label: "Score", icon: "sparkles", color: MirrorTheme.indigo)
@@ -176,12 +193,16 @@ struct ProfileView: View {
             Image(systemName: icon)
                 .font(.system(size: 16))
                 .foregroundStyle(color)
+                .accessibilityHidden(true)
 
             Text(value)
-                .font(.system(size: 20, weight: .bold, design: .rounded))
+                .font(.title3)
+                .fontWeight(.bold)
+                .fontDesign(.rounded)
 
             Text(label)
-                .font(.system(size: 10, weight: .medium))
+                .font(.caption2)
+                .fontWeight(.medium)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
@@ -194,6 +215,8 @@ struct ProfileView: View {
                         .strokeBorder(MirrorTheme.borderColor, lineWidth: 1)
                 )
         )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(label): \(value)")
     }
 
     // MARK: - Tier & Subscription
@@ -213,8 +236,10 @@ struct ProfileView: View {
                     HStack(spacing: 6) {
                         Image(systemName: appState.subscriptionPlan == "free" ? "crown" : "crown.fill")
                             .font(.system(size: 13))
+                            .accessibilityHidden(true)
                         Text(subscriptionLabel)
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.caption)
+                            .fontWeight(.bold)
                     }
                     .foregroundStyle(appState.subscriptionPlan == "free" ? .secondary : Color(hex: "FFD700"))
                     .padding(.horizontal, 14)
@@ -235,6 +260,8 @@ struct ProfileView: View {
                             )
                     )
                 }
+                .accessibilityLabel("Subscription: \(subscriptionLabel)")
+                .accessibilityHint("Opens subscription management")
             }
         }
     }
@@ -243,11 +270,11 @@ struct ProfileView: View {
 
     private var quickLinks: some View {
         HStack(spacing: 12) {
-            quickLinkButton(icon: "person.2.fill", label: "Friends", color: MirrorTheme.purple) {
+            quickLinkButton(icon: "person.2.fill", label: L10n.profileFriends, color: MirrorTheme.purple) {
                 showFriends = true
             }
 
-            quickLinkButton(icon: "bell.fill", label: "Notifications", color: MirrorTheme.pink, badge: appState.unreadNotificationCount) {
+            quickLinkButton(icon: "bell.fill", label: L10n.profileNotifications, color: MirrorTheme.pink, badge: appState.unreadNotificationCount) {
                 showNotifications = true
             }
         }
@@ -269,25 +296,30 @@ struct ProfileView: View {
                         .font(.system(size: 15))
                         .foregroundStyle(color)
                 }
+                .accessibilityHidden(true)
 
                 Text(label)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
                     .foregroundStyle(.primary)
 
                 Spacer()
 
                 if badge > 0 {
                     Text("\(badge)")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(.caption2)
+                        .fontWeight(.bold)
                         .foregroundStyle(.white)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
                         .background(Capsule().fill(.red))
+                        .accessibilityLabel("\(badge) unread")
                 }
 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(14)
@@ -300,14 +332,17 @@ struct ProfileView: View {
                     )
             )
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
     }
 
     // MARK: - Posts Grid
 
     private var postsGrid: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Your Posts")
-                .font(.system(size: 18, weight: .bold))
+            Text(L10n.profileYourPosts)
+                .font(.headline)
+                .accessibilityAddTraits(.isHeader)
 
             if appState.feedPosts.filter({ $0.userId == appState.currentUser?.id }).isEmpty {
                 GlassCard {
@@ -315,13 +350,14 @@ struct ProfileView: View {
                         Image(systemName: "camera.fill")
                             .font(.system(size: 28))
                             .foregroundStyle(.tertiary)
+                            .accessibilityHidden(true)
 
-                        Text("No posts yet")
-                            .font(.system(size: 14))
+                        Text(L10n.profileNoPosts)
+                            .font(.subheadline)
                             .foregroundStyle(.secondary)
 
-                        Text("Share your outfits with the community!")
-                            .font(.system(size: 12))
+                        Text(L10n.profileShareOutfits)
+                            .font(.caption)
                             .foregroundStyle(.tertiary)
                     }
                     .frame(maxWidth: .infinity)
@@ -349,6 +385,8 @@ struct ProfileView: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 8))
                             }
                         }
+                        .accessibilityLabel(L10n.a11yPostImage)
+                        .accessibilityAddTraits(.isImage)
                     }
                 }
             }

@@ -256,7 +256,7 @@ subscriptions.post('/verify', async (c) => {
       });
 
     if (historyError) {
-      console.error('Failed to create subscription history:', historyError);
+      logger.error({ err: historyError }, 'Failed to create subscription history');
     }
 
     // Update user subscription plan and reset credits
@@ -478,7 +478,7 @@ subscriptions.post('/purchases/credits', async (c) => {
       });
 
     if (purchaseError) {
-      console.error('Failed to create purchase record:', purchaseError);
+      logger.error({ err: purchaseError }, 'Failed to create purchase record');
     }
 
     return c.json({

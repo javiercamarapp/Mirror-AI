@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '../services/supabase.js';
+import { logger } from '../services/logger.js';
 
 /**
  * Cleans up expired stories and their associated story_views.
@@ -27,12 +28,12 @@ export async function cleanupExpiredStories(): Promise<{
       .lt('expires_at', now);
 
     if (fetchError) {
-      console.error('[StoryCleanup] Failed to fetch expired stories:', fetchError.message);
+      logger.error({ err: fetchError.message }, 'StoryCleanup: Failed to fetch expired stories');
       return { deletedStories: 0, deletedViews: 0 };
     }
 
     if (!expiredStories || expiredStories.length === 0) {
-      console.log('[StoryCleanup] No expired stories found');
+      logger.debug('StoryCleanup: No expired stories found');
       return { deletedStories: 0, deletedViews: 0 };
     }
 
@@ -50,7 +51,7 @@ export async function cleanupExpiredStories(): Promise<{
         .in('story_id', batch);
 
       if (viewError) {
-        console.error('[StoryCleanup] Failed to delete story views batch:', viewError.message);
+        logger.error({ err: viewError.message }, 'StoryCleanup: Failed to delete story views batch');
       } else {
         deletedViews += batch.length;
       }
@@ -66,20 +67,21 @@ export async function cleanupExpiredStories(): Promise<{
         .in('id', batch);
 
       if (storyError) {
-        console.error('[StoryCleanup] Failed to delete stories batch:', storyError.message);
+        logger.error({ err: storyError.message }, 'StoryCleanup: Failed to delete stories batch');
       } else {
         deletedStories += batch.length;
       }
     }
 
-    console.log(
-      `[StoryCleanup] Cleaned up ${deletedStories} expired stories and ${deletedViews} story views`
+    logger.info(
+      { deletedStories, deletedViews },
+      `StoryCleanup: Cleaned up ${deletedStories} expired stories and ${deletedViews} story views`
     );
 
     return { deletedStories, deletedViews };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[StoryCleanup] Unexpected error:', message);
+    logger.error({ err: message }, 'StoryCleanup: Unexpected error');
     return { deletedStories, deletedViews };
   }
 }

@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { authMiddleware } from '../middleware/auth.js';
 import { cleanupExpiredStories } from '../jobs/storyCleanup.js';
+import { logger } from '../services/logger.js';
 import type { AppVariables } from '../types/index.js';
 
 const admin = new Hono<{ Variables: AppVariables }>();
@@ -38,7 +39,7 @@ admin.get('/jobs/cleanup-stories', async (c) => {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[Admin] Story cleanup failed:', err);
+    logger.error({ err }, 'Admin story cleanup failed');
     return c.json({ success: false, error: message }, 500);
   }
 });

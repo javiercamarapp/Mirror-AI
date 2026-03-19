@@ -2,6 +2,7 @@ import SwiftUI
 
 struct OnboardingView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var currentStep = 0
     @State private var name = ""
@@ -41,7 +42,7 @@ struct OnboardingView: View {
                     selfieStep.tag(5)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
-                .animation(.smooth(duration: 0.4), value: currentStep)
+                .animation(reduceMotion ? .none : .smooth(duration: 0.4), value: currentStep)
 
                 // Navigation buttons
                 navigationButtons
@@ -67,7 +68,7 @@ struct OnboardingView: View {
                 Capsule()
                     .fill(step <= currentStep ? AnyShapeStyle(MirrorTheme.gradientPrimary) : AnyShapeStyle(Color.white.opacity(0.2)))
                     .frame(height: 4)
-                    .animation(.spring(response: 0.3), value: currentStep)
+                    .animation(reduceMotion ? .none : .spring(response: 0.3), value: currentStep)
             }
         }
     }
@@ -162,7 +163,8 @@ struct OnboardingView: View {
             Spacer()
         }
         .padding(.horizontal)
-        .animation(.easeInOut(duration: 0.3), value: selectedAgeRange)
+        .animation(reduceMotion ? .none : .easeInOut(duration: 0.3), value: selectedAgeRange)
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }
 
     private func ageOptionCard(label: String, value: String) -> some View {
@@ -348,6 +350,8 @@ struct OnboardingView: View {
 
                     Slider(value: $height, in: 140...220, step: 1)
                         .tint(MirrorTheme.purple)
+                        .accessibilityLabel(L10n.a11yHeightSlider)
+                        .accessibilityValue(L10n.heightValue(Int(height)))
                 }
                 .padding(20)
                 .background(

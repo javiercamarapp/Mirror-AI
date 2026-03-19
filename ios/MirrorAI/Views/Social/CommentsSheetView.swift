@@ -45,6 +45,7 @@ struct CommentsSheetView: View {
                             .font(.system(size: 22))
                             .foregroundStyle(.secondary)
                     }
+                    .accessibilityLabel(L10n.a11yCloseButton)
                 }
             }
             .task {

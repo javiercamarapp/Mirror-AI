@@ -14,6 +14,7 @@ struct SocialFeedView: View {
     @State private var showPostCreator = false
     @State private var showError = false
     @State private var errorMessage = ""
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showReportSheet = false
     @State private var showBlockAlert = false
     @State private var reportTargetPostId: String?
@@ -89,8 +90,9 @@ struct SocialFeedView: View {
                 .padding(.bottom, 100)
             }
             .background(Color(UIColor.systemBackground))
-            .navigationTitle("Feed")
+            .navigationTitle(L10n.feedTitle)
             .navigationBarTitleDisplayMode(.inline)
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -360,6 +362,7 @@ private struct FeedPostCard: View {
     var onReport: (() -> Void)? = nil
     var onBlock: (() -> Void)? = nil
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showHeartAnimation = false
     @State private var heartScale: CGFloat = 0
     @State private var heartOpacity: Double = 0
@@ -459,13 +462,13 @@ private struct FeedPostCard: View {
                 Button(role: .destructive) {
                     onReport?()
                 } label: {
-                    Label("Report Post", systemImage: "exclamationmark.triangle")
+                    Label(L10n.feedReportPost, systemImage: "exclamationmark.triangle")
                 }
 
                 Button(role: .destructive) {
                     onBlock?()
                 } label: {
-                    Label("Block User", systemImage: "hand.raised")
+                    Label(L10n.feedBlockUser, systemImage: "hand.raised")
                 }
             } label: {
                 Image(systemName: "ellipsis")
@@ -474,6 +477,7 @@ private struct FeedPostCard: View {
                     .frame(width: 30, height: 30)
                     .contentShape(Rectangle())
             }
+            .accessibilityLabel(L10n.a11yMoreOptions)
         }
     }
 
@@ -522,6 +526,9 @@ private struct FeedPostCard: View {
         .onTapGesture(count: 1) {
             onTap()
         }
+        .accessibilityLabel(L10n.a11yPostImage)
+        .accessibilityHint(L10n.a11yDoubleTapToLike)
+        .accessibilityAddTraits(.isImage)
     }
 
     // MARK: - Action Bar
@@ -531,12 +538,14 @@ private struct FeedPostCard: View {
             Button {
                 let impact = UIImpactFeedbackGenerator(style: .medium)
                 impact.impactOccurred()
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
-                    likeButtonScale = 1.3
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                if !reduceMotion {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
-                        likeButtonScale = 1.0
+                        likeButtonScale = 1.3
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+                            likeButtonScale = 1.0
+                        }
                     }
                 }
                 onLike()
@@ -546,6 +555,8 @@ private struct FeedPostCard: View {
                     .foregroundStyle(post.isLiked == true ? MirrorTheme.pink : .primary)
                     .scaleEffect(likeButtonScale)
             }
+            .accessibilityLabel(L10n.a11yLikeButton)
+            .accessibilityValue(post.isLiked == true ? L10n.a11yLiked : L10n.a11yUnliked)
 
             Button {
                 let impact = UIImpactFeedbackGenerator(style: .light)
@@ -556,6 +567,7 @@ private struct FeedPostCard: View {
                     .font(.system(size: 21))
                     .foregroundStyle(.primary)
             }
+            .accessibilityLabel(L10n.a11yCommentButton)
 
             Button {
                 let impact = UIImpactFeedbackGenerator(style: .light)
@@ -565,6 +577,7 @@ private struct FeedPostCard: View {
                     .font(.system(size: 20))
                     .foregroundStyle(.primary)
             }
+            .accessibilityLabel(L10n.a11yShareButton)
 
             Spacer()
 
@@ -576,6 +589,7 @@ private struct FeedPostCard: View {
                     .font(.system(size: 20))
                     .foregroundStyle(.primary)
             }
+            .accessibilityLabel(L10n.a11yBookmarkButton)
         }
     }
 

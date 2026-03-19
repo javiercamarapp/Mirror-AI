@@ -208,6 +208,7 @@ struct StoryViewerView: View {
                     .padding(8)
                     .background(Circle().fill(Color.white.opacity(0.15)))
             }
+            .accessibilityLabel(L10n.a11yCloseButton)
         }
     }
 

@@ -6,6 +6,7 @@ import { uploadImage, deleteImage, extractPathFromUrl } from '../services/storag
 import { tryOn } from '../services/fashn.js';
 import { generateImage } from '../services/flux.js';
 import { analyzeImageJSON } from '../services/gemini.js';
+import { logger } from '../services/logger.js';
 import type { AppVariables } from '../types/index.js';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -64,7 +65,7 @@ avatar.post('/generate', requireSubscription('basic'), async (c) => {
 Return ONLY valid JSON.`
       );
     } catch (aiErr) {
-      console.error('AI selfie analysis failed, using defaults:', aiErr);
+      logger.warn({ err: aiErr }, 'AI selfie analysis failed, using defaults');
     }
 
     // Use Flux to generate a stylized full-body avatar based on the analysis
@@ -138,7 +139,7 @@ Return ONLY valid JSON.`
     return c.json({ success: true, data }, 201);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[Avatar Generate Error]:', err);
+    logger.error({ err }, 'Avatar generation failed');
     return c.json({ success: false, error: message }, 500);
   }
 });
@@ -299,7 +300,7 @@ avatar.post('/try-outfit', async (c) => {
         storedUrl = await uploadImage('outfits', storagePath, buffer, 'image/png');
       }
     } catch (storageErr) {
-      console.error('Failed to persist try-outfit result to storage:', storageErr);
+      logger.warn({ err: storageErr }, 'Failed to persist try-outfit result to storage');
     }
 
     // Decrement vton_credits atomically using database function to prevent race conditions
@@ -322,7 +323,7 @@ avatar.post('/try-outfit', async (c) => {
       });
 
     if (renderError) {
-      console.error('Failed to create avatar render record:', renderError);
+      logger.error({ err: renderError }, 'Failed to create avatar render record');
     }
 
     return c.json({
@@ -335,7 +336,7 @@ avatar.post('/try-outfit', async (c) => {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[Avatar Try-Outfit Error]:', err);
+    logger.error({ err }, 'Avatar try-outfit failed');
     return c.json({ success: false, error: message }, 500);
   }
 });
@@ -413,7 +414,7 @@ avatar.delete('/renders/:id', async (c) => {
         try {
           await deleteImage('outfits', path);
         } catch {
-          console.error('Failed to delete render image from storage');
+          logger.error('Failed to delete render image from storage');
         }
       }
     }

@@ -7,6 +7,7 @@ struct EmptyStateView: View {
     var actionTitle: String?
     var action: (() -> Void)?
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isAnimating = false
 
     var body: some View {
@@ -17,7 +18,7 @@ struct EmptyStateView: View {
                 Circle()
                     .fill(MirrorTheme.purple.opacity(0.08))
                     .frame(width: 120, height: 120)
-                    .scaleEffect(isAnimating ? 1.1 : 1.0)
+                    .scaleEffect(reduceMotion ? 1.0 : (isAnimating ? 1.1 : 1.0))
 
                 Circle()
                     .fill(MirrorTheme.purple.opacity(0.06))
@@ -28,16 +29,20 @@ struct EmptyStateView: View {
                     .foregroundStyle(MirrorTheme.gradientPrimary)
                     .symbolEffect(.pulse, options: .repeating.speed(0.5))
             }
+            .accessibilityHidden(true)
 
             VStack(spacing: 8) {
                 Text(title)
-                    .font(.system(size: 22, weight: .bold))
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .accessibilityAddTraits(.isHeader)
 
                 Text(description)
-                    .font(.system(size: 15))
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
+                    .lineLimit(nil)
             }
 
             if let actionTitle, let action {
@@ -48,8 +53,10 @@ struct EmptyStateView: View {
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "plus.circle.fill")
+                            .accessibilityHidden(true)
                         Text(actionTitle)
-                            .font(.system(size: 16, weight: .bold))
+                            .font(.callout)
+                            .fontWeight(.bold)
                     }
                     .foregroundStyle(.white)
                     .padding(.horizontal, 32)
@@ -59,12 +66,14 @@ struct EmptyStateView: View {
                             .fill(MirrorTheme.gradientPrimary)
                     )
                 }
+                .accessibilityLabel(actionTitle)
             }
 
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
+            guard !reduceMotion else { return }
             withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
                 isAnimating = true
             }

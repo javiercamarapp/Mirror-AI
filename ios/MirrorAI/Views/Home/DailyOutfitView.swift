@@ -9,6 +9,7 @@ struct DailyOutfitView: View {
     @State private var isSaving = false
     @State private var selectedOccasion = "Casual"
     @State private var showShareSheet = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var animateItems = false
 
     private let occasions = ["Casual", "Work", "Date Night", "Party", "Formal", "Gym", "Weekend"]
@@ -34,6 +35,7 @@ struct DailyOutfitView: View {
             .background(Color(UIColor.systemBackground))
             .navigationTitle("Daily Outfit")
             .navigationBarTitleDisplayMode(.inline)
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Close") { dismiss() }

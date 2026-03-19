@@ -6,7 +6,7 @@ import { supabaseAdmin } from './services/supabase.js';
 import { logger } from './services/logger.js';
 import { isRedisHealthy, disconnectRedis } from './services/redis.js';
 import { requestLogger } from './middleware/requestLogger.js';
-import { rateLimiter, endpointRateLimiter } from './middleware/rateLimiter.js';
+import { rateLimiter } from './middleware/rateLimiter.js';
 import { globalErrorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import type { AppVariables } from './types/index.js';
 import { authRoutes } from './routes/auth.js';

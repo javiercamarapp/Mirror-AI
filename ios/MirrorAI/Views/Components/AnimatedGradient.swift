@@ -1,14 +1,34 @@
 import SwiftUI
 
 struct AnimatedGradient: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var animatePhase: CGFloat = 0
 
     var body: some View {
-        if #available(iOS 18.0, *) {
+        if reduceMotion {
+            // Static gradient for reduced motion
+            staticGradientView
+        } else if #available(iOS 18.0, *) {
             meshGradientView
         } else {
             fallbackGradientView
         }
+    }
+
+    // MARK: - Static Gradient (Reduced Motion)
+
+    private var staticGradientView: some View {
+        LinearGradient(
+            colors: [
+                Color(hex: "1a0533"),
+                Color(hex: "2d1b69"),
+                Color(hex: "4c1d95"),
+                Color(hex: "1a0533")
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .accessibilityHidden(true)
     }
 
     // MARK: - iOS 18+ Mesh Gradient
@@ -49,6 +69,7 @@ struct AnimatedGradient: View {
                 ]
             )
         }
+        .accessibilityHidden(true)
     }
 
     // MARK: - Fallback Gradient (iOS 17)
@@ -126,5 +147,6 @@ struct AnimatedGradient: View {
                 animatePhase = .pi * 2
             }
         }
+        .accessibilityHidden(true)
     }
 }

@@ -3,6 +3,7 @@ import AuthenticationServices
 
 struct AuthView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isAnimating = false
     @State private var showPrivacyPolicy = false
     @State private var showTermsOfService = false
@@ -43,10 +44,15 @@ struct AuthView: View {
             .padding(.horizontal, 32)
         }
         .onAppear {
-            withAnimation(.easeOut(duration: 1.0).delay(0.3)) {
+            if reduceMotion {
                 isAnimating = true
+            } else {
+                withAnimation(.easeOut(duration: 1.0).delay(0.3)) {
+                    isAnimating = true
+                }
             }
         }
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .sheet(isPresented: $showPrivacyPolicy) {
             privacyPolicySheet
         }
@@ -75,19 +81,24 @@ struct AuthView: View {
             }
 
             // App name
-            Text("Mirror AI")
-                .font(.system(size: 42, weight: .bold, design: .rounded))
+            Text(L10n.authAppName)
+                .font(.largeTitle)
+                .fontWeight(.bold)
+                .fontDesign(.rounded)
                 .foregroundStyle(MirrorTheme.gradientPrimary)
+                .minimumScaleFactor(0.7)
+                .accessibilityAddTraits(.isHeader)
 
-            Text("Your AI Fashion Companion")
-                .font(.system(size: 17, weight: .medium))
+            Text(L10n.authTagline)
+                .font(.body)
+                .fontWeight(.medium)
                 .foregroundStyle(.white.opacity(0.7))
 
             // Feature highlights
             VStack(spacing: 12) {
-                featureRow(icon: "wand.and.stars", text: "AI-Powered Styling")
-                featureRow(icon: "person.fill.viewfinder", text: "Virtual Try-On")
-                featureRow(icon: "chart.line.uptrend.xyaxis", text: "Track Your Style Score")
+                featureRow(icon: "wand.and.stars", text: L10n.authFeatureStyling)
+                featureRow(icon: "person.fill.viewfinder", text: L10n.authFeatureTryOn)
+                featureRow(icon: "chart.line.uptrend.xyaxis", text: L10n.authFeatureScore)
             }
             .padding(.top, 24)
         }
@@ -96,17 +107,20 @@ struct AuthView: View {
     private func featureRow(icon: String, text: String) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 16))
+                .font(.subheadline)
                 .foregroundStyle(MirrorTheme.pink)
                 .frame(width: 24)
+                .accessibilityHidden(true)
 
             Text(text)
-                .font(.system(size: 15, weight: .medium))
+                .font(.subheadline)
+                .fontWeight(.medium)
                 .foregroundStyle(.white.opacity(0.85))
 
             Spacer()
         }
         .padding(.horizontal, 8)
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: - Auth Buttons
@@ -131,8 +145,9 @@ struct AuthView: View {
                     Image(systemName: "g.circle.fill")
                         .font(.system(size: 20))
 
-                    Text("Continue with Google")
-                        .font(.system(size: 17, weight: .semibold))
+                    Text(L10n.authContinueGoogle)
+                        .font(.body)
+                        .fontWeight(.semibold)
                 }
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
@@ -155,8 +170,9 @@ struct AuthView: View {
                     Image(systemName: "envelope.fill")
                         .font(.system(size: 18))
 
-                    Text("Continue with Email")
-                        .font(.system(size: 17, weight: .semibold))
+                    Text(L10n.authContinueEmail)
+                        .font(.body)
+                        .fontWeight(.semibold)
                 }
                 .foregroundStyle(.white.opacity(0.9))
                 .frame(maxWidth: .infinity)
@@ -178,25 +194,27 @@ struct AuthView: View {
 
     private var privacySection: some View {
         VStack(spacing: 8) {
-            Text("By continuing, you agree to our")
-                .font(.system(size: 12))
+            Text(L10n.authTermsPrefix)
+                .font(.caption)
                 .foregroundStyle(.white.opacity(0.5))
 
             HStack(spacing: 4) {
-                Button("Terms of Service") {
+                Button(L10n.authTermsOfService) {
                     showTermsOfService = true
                 }
-                .font(.system(size: 12, weight: .medium))
+                .font(.caption)
+                .fontWeight(.medium)
                 .foregroundStyle(MirrorTheme.purple)
 
-                Text("and")
-                    .font(.system(size: 12))
+                Text(L10n.authAnd)
+                    .font(.caption)
                     .foregroundStyle(.white.opacity(0.5))
 
-                Button("Privacy Policy") {
+                Button(L10n.authPrivacyPolicy) {
                     showPrivacyPolicy = true
                 }
-                .font(.system(size: 12, weight: .medium))
+                .font(.caption)
+                .fontWeight(.medium)
                 .foregroundStyle(MirrorTheme.purple)
             }
         }

@@ -13,6 +13,7 @@ struct VirtualTryOnView: View {
     @State private var showPaywall = false
     @State private var animateCredits = false
     @State private var showError = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var errorMessage = ""
 
     private let categories = ["All", "Tops", "Bottoms", "Dresses", "Outerwear", "Shoes"]
@@ -61,6 +62,7 @@ struct VirtualTryOnView: View {
             }
             .navigationTitle("Virtual Try-On")
             .navigationBarTitleDisplayMode(.inline)
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
