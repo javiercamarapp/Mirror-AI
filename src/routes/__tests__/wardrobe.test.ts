@@ -57,14 +57,15 @@ function chainMock(returnValue: { data: any; error: any; count?: number | null }
   const methods = [
     'select', 'insert', 'update', 'delete',
     'eq', 'neq', 'or', 'in', 'ilike', 'contains', 'not', 'gt',
-    'single', 'maybeSingle', 'order', 'limit', 'range',
+    'order', 'limit', 'range',
   ];
   for (const m of methods) {
     chain[m] = vi.fn(() => chain);
   }
   chain.single = vi.fn(() => Promise.resolve(returnValue));
   chain.maybeSingle = vi.fn(() => Promise.resolve(returnValue));
-  chain.then = (resolve: any) => resolve(returnValue);
+  // Make the chain thenable so `await query` resolves to returnValue
+  chain.then = (resolve: any, reject?: any) => Promise.resolve(returnValue).then(resolve, reject);
   return chain;
 }
 
